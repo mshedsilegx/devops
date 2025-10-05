@@ -30,7 +30,7 @@ FF_ONLY=0
 ATOMIC_PUSH=0
 FORCE_DANGEROUS=0
 GIT_CMD="git"
-# LOCK_FILE is now dynamically generated per repository
+# Directory based lock is dynamically generated per repository
 
 # --- Logging Functions ---
 log_info() {
