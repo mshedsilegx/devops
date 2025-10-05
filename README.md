@@ -119,3 +119,28 @@ Now you can run the script with fewer arguments:
 # Clones the repo from the URL in the .env file and pulls from the 'develop' branch
 ./git_sync.sh --sync-method=init-and-sync --pull-method=fetch-merge
 ```
+
+## 5. In-Depth Option Explanations
+
+### Synchronization Methods (`--sync-method`)
+-   **`pull-only`**: Fetches changes from the remote repository and applies them to the local branch. This is useful for updating a local workspace without pushing any local changes.
+-   **`push-only`**: Pushes local commits to the remote repository. This is useful when you have committed changes locally and want to share them.
+-   **`pull-push`**: The most common workflow. It first pulls changes from the remote to ensure the local branch is up-to-date, then pushes local commits.
+-   **`init-and-sync`**: Designed for initial setup. It clones the repository if it doesn't already exist in the specified directory, and then performs a pull operation to ensure it's synchronized.
+
+### Pull Methods (`--pull-method`)
+-   **`pull`**: Executes a standard `git pull` command, which is a shorthand for fetching and then merging or rebasing (depending on `--pull-strategy`).
+-   **`fetch-merge`**: A more explicit two-step process. It first runs `git fetch` to retrieve all new data from the remote, then runs `git merge` to integrate the changes. This creates a merge commit if the histories have diverged.
+-   **`fetch-rebase`**: Fetches from the remote and then uses `git rebase` to re-apply local commits on top of the updated remote branch. This results in a linear history but rewrites commit hashes.
+-   **`fetch-reset`**: A **destructive** operation that makes the local branch exactly match the remote branch. It fetches the latest data and then runs `git reset --hard`. Any local commits that have not been pushed will be permanently lost. Requires `--force-dangerous-operations`.
+
+### Push Methods (`--push-method`)
+-   **`default`**: Performs a standard `git push`. This will fail if the push is not a fast-forward (i.e., if the remote has changes you don't have locally).
+-   **`force`**: Performs a `git push --force-with-lease`. This is a **destructive** operation that overwrites the remote branch with the local one. It's safer than `--force` because it will not overwrite work if someone else has pushed to the remote branch since you last pulled. Requires `--force-dangerous-operations`.
+-   **`set-upstream`**: Pushes the current branch and adds the upstream (tracking) reference. This is useful the first time you push a new branch (`git push -u origin <branch>`).
+
+### Other Important Options
+-   **`--pull-strategy=<strategy>`**: Only used with `--pull-method=pull`. It specifies whether to use a `merge` (creates a merge commit) or `rebase` (linear history) strategy when pulling.
+-   **`--prune`**: When fetching, this option removes any remote-tracking references that no longer exist on the remote. It helps keep your local repository clean.
+-   **`--ff-only`**: When merging (with `pull` or `fetch-merge`), this ensures that the merge is only completed if it's a fast-forward. If the branches have diverged, the merge will fail.
+-   **`--atomic-push`**: Ensures that when pushing multiple branches, either all of them are updated on the remote, or none are. This prevents the remote repository from ending up in a partially updated state.
