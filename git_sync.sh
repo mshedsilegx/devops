@@ -47,6 +47,31 @@ log_error() {
 }
 
 # --- Lock Functions ---
+get_temp_dir() {
+    # Use TMPDIR if set, otherwise default to /tmp
+    local temp_dir="${TMPDIR:-/tmp}"
+    # Ensure the directory exists and is writable
+    if [ ! -d "${temp_dir}" ] || [ ! -w "${temp_dir}" ]; then
+        log_error "The temporary directory '${temp_dir}' is not a writable directory. Please set TMPDIR to a valid path."
+    fi
+    echo "${temp_dir}"
+}
+
+get_lock_file_path() {
+    # Get the top-level directory of the repository to create a unique identifier
+    local repo_path
+    repo_path=$(git rev-parse --show-toplevel)
+
+    # Create a unique but consistent hash based on the repository path
+    local repo_identifier
+    repo_identifier=$(echo -n "${repo_path}" | md5sum | cut -d' ' -f1)
+
+    local temp_dir
+    temp_dir=$(get_temp_dir)
+
+    echo "${temp_dir}/git_sync_${repo_identifier}.lock"
+}
+
 acquire_lock() {
     local lock_file_path="$1"
     if [ -e "${lock_file_path}" ]; then
@@ -293,10 +318,9 @@ main() {
             log_error "Not inside a Git repository. Use --sync-method=init-and-sync to clone a new repository."
         fi
 
-        # Generate a repository-specific lock file path within the .git directory
-        local git_dir
-        git_dir=$(git rev-parse --git-dir)
-        local lock_file="${git_dir}/git_sync.lock"
+        # Generate a repository-specific lock file path
+        local lock_file
+        lock_file=$(get_lock_file_path)
 
         acquire_lock "${lock_file}"
         # Set trap to release the specific lock file on exit
