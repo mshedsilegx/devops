@@ -12,17 +12,17 @@ This document provides solutions to common issues you may encounter when using t
 
 ---
 
-### 1. Lock File Exists
+### 1. Lock Directory Exists
 
--   **Error Message**: `Lock file found at /tmp/git_sync_<repo_hash>.lock. Another instance of git_sync.sh may be running for this repository.`
--   **Cause**: This error occurs if a previous run of the script for the same repository was interrupted or if another instance is currently running. The script creates a unique lock file for each repository to prevent concurrent operations on the same repository.
+-   **Error Message**: `Lock directory found at /tmp/git_sync_<repo_hash>.lockdir. Another instance of git_sync.sh may be running for this repository.`
+-   **Cause**: This error occurs if a previous run of the script for the same repository was interrupted or if another instance is currently running. The script creates a unique lock directory for each repository to prevent concurrent operations.
 -   **Solution**:
     1.  First, verify that no other `git_sync.sh` process is running for this specific repository. You can check this using a command like `ps aux | grep git_sync.sh`.
-    2.  If you are certain no other instance is running, you can safely remove the lock file. The lock file is typically located in the `/tmp` directory (or the directory specified by the `$TMPDIR` environment variable) and is named `git_sync_<repo_hash>.lock`. You will need to find the correct lock file for your repository. The error message will show the exact path.
-    3.  To remove it, use the full path from the error message:
+    2.  If you are certain no other instance is running, you can safely remove the lock directory. It is typically located in the `/tmp` directory (or the directory specified by the `$TMPDIR` environment variable) and is named `git_sync_<repo_hash>.lockdir`. The error message will show the exact path.
+    3.  To remove it, use the `rmdir` command with the full path from the error message:
         ```bash
         # Example:
-        rm /tmp/git_sync_a1b2c3d4e5f6.lock
+        rmdir /tmp/git_sync_a1b2c3d4e5f6.lockdir
         ```
     4.  Rerun the script.
 

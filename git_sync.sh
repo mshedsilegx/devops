@@ -57,7 +57,7 @@ get_temp_dir() {
     echo "${temp_dir}"
 }
 
-get_lock_file_path() {
+get_lock_dir_path() {
     # Get the top-level directory of the repository to create a unique identifier
     local repo_path
     repo_path=$(git rev-parse --show-toplevel)
@@ -69,23 +69,24 @@ get_lock_file_path() {
     local temp_dir
     temp_dir=$(get_temp_dir)
 
-    echo "${temp_dir}/git_sync_${repo_identifier}.lock"
+    echo "${temp_dir}/git_sync_${repo_identifier}.lockdir"
 }
 
 acquire_lock() {
-    local lock_file_path="$1"
-    if [ -e "${lock_file_path}" ]; then
-        log_error "Lock file found at ${lock_file_path}. Another instance of git_sync.sh may be running for this repository. If this is an error, please remove the lock file manually."
+    local lock_dir_path="$1"
+    # Atomically create the lock directory. Fails if it already exists.
+    if ! mkdir "${lock_dir_path}" 2>/dev/null; then
+        return 1
     fi
-    touch "${lock_file_path}"
-    log_info "Lock file created at ${lock_file_path}."
+    log_info "Lock acquired at ${lock_dir_path}."
+    return 0
 }
 
 release_lock() {
-    local lock_file_path="$1"
-    if [ -e "${lock_file_path}" ]; then
-        rm -f "${lock_file_path}"
-        log_info "Lock file removed from ${lock_file_path}."
+    local lock_dir_path="$1"
+    if [ -d "${lock_dir_path}" ]; then
+        rmdir "${lock_dir_path}"
+        log_info "Lock directory removed from ${lock_dir_path}."
     fi
 }
 
@@ -231,7 +232,7 @@ clone_operation() {
         return
     fi
     log_info "Cloning '${REPO_URL}' into '${target_dir}'"
-    "${GIT_CMD}" clone -b "${REMOTE_BRANCH}" "${REPO_URL}" "${target_dir}"
+    "${GIT_CMD}" clone --branch "${REMOTE_BRANCH}" -- "${REPO_URL}" "${target_dir}"
     cd "${target_dir}" || log_error "Failed to enter directory '${target_dir}'."
 }
 
@@ -245,26 +246,26 @@ pull_operation() {
 
     case "${PULL_METHOD}" in
         pull)
-            "${GIT_CMD}" pull ${prune_flag} ${merge_options} --${PULL_STRATEGY} "${REMOTE_NAME}" "${REMOTE_BRANCH}:${LOCAL_BRANCH}"
+            "${GIT_CMD}" pull ${prune_flag} ${merge_options} --${PULL_STRATEGY} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}:${LOCAL_BRANCH}"
             ;;
         fetch-merge)
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+            "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
                 "${GIT_CMD}" merge --abort || log_warn "git merge --abort failed. The repository may be in a conflicted state."
                 log_error "Merge conflict occurred. Please resolve it manually."
             fi
             ;;
         fetch-rebase)
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            if ! "${GIT_CMD}" rebase "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+            "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            if ! "${GIT_CMD}" rebase -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
                 "${GIT_CMD}" rebase --abort || log_warn "git rebase --abort failed. The repository may be in a conflicted state."
                 log_error "Rebase conflict occurred. Please resolve it manually."
             fi
             ;;
         fetch-reset)
             confirm_dangerous_operation "fetch-reset"
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            "${GIT_CMD}" reset --hard "${REMOTE_NAME}/${REMOTE_BRANCH}"
+            "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            "${GIT_CMD}" reset --hard -- "${REMOTE_NAME}/${REMOTE_BRANCH}"
             ;;
         *) log_error "Invalid pull method: '${PULL_METHOD}'.";;
     esac
@@ -287,7 +288,7 @@ push_operation() {
         set-upstream) push_options="-u";;
         *) log_error "Invalid push method: '${PUSH_METHOD}'.";;
     esac
-    "${GIT_CMD}" push ${atomic_flag} ${push_options} "${REMOTE_NAME}" "${LOCAL_BRANCH}:${REMOTE_BRANCH}"
+    "${GIT_CMD}" push ${atomic_flag} ${push_options} -- "${REMOTE_NAME}" "${LOCAL_BRANCH}:${REMOTE_BRANCH}"
     log_info "PUSH operation completed."
 }
 
@@ -305,6 +306,11 @@ main() {
         log_error "Missing required argument --sync-method. Use --help for more information."
     fi
 
+    # Check for embedded credentials in the URL and warn the user
+    if [[ "${REPO_URL}" == *"://"*@"*"* ]]; then
+        log_warn "The repository URL appears to contain embedded credentials. For better security, please use a Git credential helper instead."
+    fi
+
     if [ "${SYNC_METHOD}" == "init-and-sync" ]; then
         if [ -z "${REPO_URL}" ]; then
             log_error "REPO_URL is required for init-and-sync. Set it in git_sync.env or use --repo-url."
@@ -313,18 +319,22 @@ main() {
     fi
 
     # From this point, we expect to be inside a Git repository.
+    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log_error "Not inside a Git repository. For initial cloning, use --sync-method=init-and-sync."
+    fi
+
+    # --- LOCKING & STATE CHECK ---
     if [ "${DRY_RUN}" -eq 0 ]; then
-        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-            log_error "Not inside a Git repository. Use --sync-method=init-and-sync to clone a new repository."
+        local lock_dir
+        lock_dir=$(get_lock_dir_path)
+
+        # Attempt to acquire the lock. If it fails, another instance is running.
+        if ! acquire_lock "${lock_dir}"; then
+            log_error "Failed to acquire lock. Another instance may be running. Lock directory: ${lock_dir}"
         fi
 
-        # Generate a repository-specific lock file path
-        local lock_file
-        lock_file=$(get_lock_file_path)
-
-        acquire_lock "${lock_file}"
-        # Set trap to release the specific lock file on exit
-        trap 'release_lock "${lock_file}"' EXIT SIGINT SIGTERM
+        # If the script exits for any reason from this point on, the trap will release the lock.
+        trap 'release_lock "${lock_dir}"' EXIT SIGINT SIGTERM
 
         check_repo_state
     fi
@@ -354,17 +364,21 @@ main() {
     log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
 
     case "${SYNC_METHOD}" in
-        pull-only) pull_operation;;
-        push-only) push_operation;;
+        pull-only)
+            pull_operation || log_error "The pull operation failed. Please check the output above for details."
+            ;;
+        push-only)
+            push_operation || log_error "The push operation failed. Please check the output above for details."
+            ;;
         pull-push)
-            pull_operation
+            pull_operation || log_error "The pull operation failed. Please check the output above for details."
             log_info "Pull complete, proceeding with push."
-            push_operation
+            push_operation || log_error "The push operation failed. Please check the output above for details."
             ;;
         init-and-sync)
             if [ -n "${PULL_METHOD}" ]; then
                 log_info "Initial clone/setup complete, proceeding with configured pull method."
-                pull_operation
+                pull_operation || log_error "The pull operation failed. Please check the output above for details."
             else
                 log_info "Initial clone/setup complete. No pull method specified, so no further action will be taken."
             fi
