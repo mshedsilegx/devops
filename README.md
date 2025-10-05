@@ -64,6 +64,22 @@ Perform a standard pull (fetch and merge) and then push to the `main` branch on 
 ./git_sync.sh --sync-method=pull-push --pull-method=fetch-merge --push-method=default --remote-branch=main
 ```
 
+### Perform a Pull Only
+
+Update the current branch with the latest changes from the remote using a rebase strategy.
+
+```bash
+./git_sync.sh --sync-method=pull-only --pull-method=fetch-rebase
+```
+
+### Perform a Push Only
+
+Push local commits to the remote `main` branch.
+
+```bash
+./git_sync.sh --sync-method=push-only --push-method=default --remote-branch=main
+```
+
 ### Initialize a Repository and Sync
 
 Clone a new repository if it doesn't exist locally, and then pull the latest changes using a rebase strategy.
