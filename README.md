@@ -22,7 +22,7 @@ The script is designed with modularity, security, and maintainability in mind.
     3.  **`git_sync.env` File**: Lowest priority. Provides default settings for a given environment.
 
 - **Security and Safety**:
-    - **Locking**: A file-based lock (`/tmp/git_sync.lock`) is used to prevent race conditions by ensuring only one instance of the script runs at a time. The lock is automatically released on script exit, error, or interruption.
+    - **Locking**: To prevent race conditions, the script uses an atomic, repository-specific locking mechanism. It creates a lock directory in a temporary directory (e.g., `/tmp`) with a unique name derived from the repository's path (e.g., `/tmp/git_sync_<repo_hash>.lockdir`). This ensures that synchronization operations for the same repository do not run concurrently, while allowing different repositories to be synced in parallel. The lock is automatically released on script exit, error, or interruption.
     - **Input Sanitization**: User-provided strings, such as the merge commit message, are sanitized to remove characters that could be used for command injection.
     - **Dangerous Operation Confirmation**: Potentially destructive operations like `fetch-reset` and `force` push require an explicit `--force-dangerous-operations` flag to prevent accidental data loss.
 
