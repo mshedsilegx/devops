@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ======================================================================
-# Git Synchronization Script (v9 - Final)
+# Git Synchronization Script (v0.0.9xg - 2025/10/04)
 #
 # A comprehensive script for automating Git synchronization. This final
 # version includes a full feature set, robust error handling, security
@@ -18,7 +18,7 @@ REMOTE_BRANCH="main"
 LOCAL_BRANCH=""
 LOCAL_DIR=""
 PULL_STRATEGY="merge"
-MERGE_MESSAGE="Automated merge by git_sync.sh"
+MERGE_MESSAGE="Automated git merge"
 
 SYNC_METHOD=""
 PULL_METHOD=""
@@ -48,11 +48,11 @@ log_error() {
 
 # --- Lock Functions ---
 get_temp_dir() {
-    # Use TMPDIR if set, otherwise default to /tmp
-    local temp_dir="${TMPDIR:-/tmp}"
+    # Use TMP if set, otherwise default to /tmp
+    local temp_dir="${TMP:-/tmp}"
     # Ensure the directory exists and is writable
     if [ ! -d "${temp_dir}" ] || [ ! -w "${temp_dir}" ]; then
-        log_error "The temporary directory '${temp_dir}' is not a writable directory. Please set TMPDIR to a valid path."
+        log_error "The temporary directory '${temp_dir}' is not a writable directory. Please set TMP to a valid path."
     fi
     echo "${temp_dir}"
 }
