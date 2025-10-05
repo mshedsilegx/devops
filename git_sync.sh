@@ -30,7 +30,7 @@ FF_ONLY=0
 ATOMIC_PUSH=0
 FORCE_DANGEROUS=0
 GIT_CMD="git"
-LOCK_FILE="/tmp/git_sync.lock"
+# LOCK_FILE is now dynamically generated per repository
 
 # --- Logging Functions ---
 log_info() {
@@ -48,19 +48,19 @@ log_error() {
 
 # --- Lock Functions ---
 acquire_lock() {
-    if [ -e "${LOCK_FILE}" ]; then
-        log_error "Lock file found at ${LOCK_FILE}. Another instance of git_sync.sh may be running. If this is an error, please remove the lock file manually."
+    local lock_file_path="$1"
+    if [ -e "${lock_file_path}" ]; then
+        log_error "Lock file found at ${lock_file_path}. Another instance of git_sync.sh may be running for this repository. If this is an error, please remove the lock file manually."
     fi
-    # Use trap to ensure the lock is released on script exit, error, or interrupt
-    trap 'release_lock' EXIT SIGINT SIGTERM
-    touch "${LOCK_FILE}"
-    log_info "Lock file created at ${LOCK_FILE}."
+    touch "${lock_file_path}"
+    log_info "Lock file created at ${lock_file_path}."
 }
 
 release_lock() {
-    if [ -e "${LOCK_FILE}" ]; then
-        rm -f "${LOCK_FILE}"
-        log_info "Lock file removed."
+    local lock_file_path="$1"
+    if [ -e "${lock_file_path}" ]; then
+        rm -f "${lock_file_path}"
+        log_info "Lock file removed from ${lock_file_path}."
     fi
 }
 
@@ -268,7 +268,6 @@ push_operation() {
 
 # --- Main Execution ---
 main() {
-    acquire_lock
     load_env_config
     parse_args "$@"
 
@@ -288,10 +287,21 @@ main() {
         clone_operation
     fi
 
+    # From this point, we expect to be inside a Git repository.
     if [ "${DRY_RUN}" -eq 0 ]; then
         if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
             log_error "Not inside a Git repository. Use --sync-method=init-and-sync to clone a new repository."
         fi
+
+        # Generate a repository-specific lock file path within the .git directory
+        local git_dir
+        git_dir=$(git rev-parse --git-dir)
+        local lock_file="${git_dir}/git_sync.lock"
+
+        acquire_lock "${lock_file}"
+        # Set trap to release the specific lock file on exit
+        trap 'release_lock "${lock_file}"' EXIT SIGINT SIGTERM
+
         check_repo_state
     fi
 
