@@ -1,49 +1,38 @@
 #!/bin/bash
 
+# ======================================================================
+# Git Synchronization Script (v9 - Final)
+#
+# A comprehensive script for automating Git synchronization. This final
+# version includes a full feature set, robust error handling, security
+# hardening, and detailed documentation.
+# ======================================================================
+
+# --- Script Setup ---
 set -euo pipefail
 
-# Function to display usage information
-usage() {
-    echo "Usage: $0 --sync-method={pull-only|push-only|pull-push|init-and-sync} [options...]" >&2
-    echo "" >&2
-    echo "Options:" >&2
-    echo "  --sync-method=<method>        : Primary synchronization method." >&2
-    echo "                                :   pull-only: Only pull changes from remote." >&2
-    echo "                                :   push-only: Only push changes to remote." >&2
-    echo "                                :   pull-push: Pull then push changes." >&2
-    echo "                                :   init-and-sync: Clone repository if not exists, then sync." >&2
-    echo "" >&2
-    echo "  --pull-method=<method>        : Method for pulling changes (required for pull-only/pull-push)." >&2
-    echo "                                :   pull: Uses 'git pull' (default merge or rebase based on git config)." >&2
-    echo "                                :   fetch-merge: Fetches, then merges (creates merge commit)." >&2
-    echo "                                :   fetch-rebase: Fetches, then rebases (rewrites history)." >&2
-    echo "                                :   fetch-reset: Fetches, then hard resets (DANGEROUS: discards local changes)." >&2
-    echo "" >&2
-    echo "  --pull-strategy=<strategy>    : Strategy for 'pull' method (merge or rebase). Default: merge." >&2
-    echo "" >&2
-    echo "  --push-method=<method>        : Method for pushing changes (required for pull-only/pull-push)." >&2
-    echo "                                :   default: Uses 'git push'." >&2
-    echo "                                :   force: Uses 'git push --force-with-lease' (DANGEROUS: overwrites remote history)." >&2
-    echo "                                :   set-upstream: Uses 'git push -u' to set upstream tracking." >&2
-    echo "" >&2
-    echo "  --dry-run                     : Print git commands instead of executing them." >&2
-    echo "  --prune                       : Prune stale remote-tracking branches during fetch/pull." >&2
-    echo "  --use-upstream                : Dynamically determine remote name and branch from local tracking." >&2
-    echo "  --ff-only                     : Only fast-forward merge; fail if not possible (for fetch-merge)." >&2
-    echo "  --atomic-push                 : Push all refs atomically (for push operations)." >&2
-    echo "  --merge-commit-message=<msg>  : Custom merge commit message (for fetch-merge)." >&2
-    echo "" >&2
-    echo "  --repo-url=<url>              : Override GIT_REPO_URL (required for init-and-sync if not in env)." >&2
-    echo "  --remote-name=<name>          : Override GIT_REMOTE_NAME (default: origin)." >&2
-    echo "  --remote-branch=<branch>      : Override GIT_REMOTE_BRANCH (default: main)." >&2
-    echo "  --local-dir=<path>            : Override GIT_LOCAL_DIR (target directory for clone)." >&2
-    echo "" >&2
-    echo "Examples:" >&2
-    echo "  $0 --sync-method=pull-push --pull-method=fetch-merge --push-method=default" >&2
-    echo "  $0 --sync-method=init-and-sync --repo-url=git@github.com:user/repo.git --pull-method=fetch-rebase" >&2
-    exit 1
-}
+# --- Global Variables ---
+REPO_URL=""
+REMOTE_NAME="origin"
+REMOTE_BRANCH="main"
+LOCAL_BRANCH=""
+LOCAL_DIR=""
+PULL_STRATEGY="merge"
+MERGE_MESSAGE="Automated merge by git_sync.sh"
 
+SYNC_METHOD=""
+PULL_METHOD=""
+PUSH_METHOD=""
+DRY_RUN=0
+PRUNE=0
+USE_UPSTREAM=0
+FF_ONLY=0
+ATOMIC_PUSH=0
+FORCE_DANGEROUS=0
+GIT_CMD="git"
+LOCK_FILE="/tmp/git_sync.lock"
+
+# --- Logging Functions ---
 log_info() {
     echo "INFO: $(date +'%Y-%m-%d %H:%M:%S') - $1"
 }
@@ -57,308 +46,301 @@ log_error() {
     exit 1
 }
 
+# --- Lock Functions ---
+acquire_lock() {
+    if [ -e "${LOCK_FILE}" ]; then
+        log_error "Lock file found at ${LOCK_FILE}. Another instance of git_sync.sh may be running. If this is an error, please remove the lock file manually."
+    fi
+    # Use trap to ensure the lock is released on script exit, error, or interrupt
+    trap 'release_lock' EXIT SIGINT SIGTERM
+    touch "${LOCK_FILE}"
+    log_info "Lock file created at ${LOCK_FILE}."
+}
 
+release_lock() {
+    if [ -e "${LOCK_FILE}" ]; then
+        rm -f "${LOCK_FILE}"
+        log_info "Lock file removed."
+    fi
+}
 
-# ======================================================================
-# Git Synchronization Script (v5 - Feature Complete)
-# ----------------------------------------------------------------------
-# Reads configuration from git_sync.env, environment variables, or arguments.
-# Includes options for Dry Run, Prune, Use Upstream, FF-Only merge, and Fetch-Rebase.
-# ======================================================================
+# --- Security and State Check Functions ---
+sanitize_input() {
+    # Basic sanitization to prevent command injection in merge messages
+    echo "$1" | tr -d ';&|()`<>*$'
+}
 
-# --- 1. Load Environment Configuration ---
-ENV_FILE="git_sync.env"
-if [ -f "${ENV_FILE}" ]; then
-    log_info "Sourcing environment variables from ${ENV_FILE}"
-    set -a
-    . "${ENV_FILE}"
-    set +a
-else
-    log_warn "Configuration file ${ENV_FILE} not found. Using defaults and environment variables."
-fi
+confirm_dangerous_operation() {
+    local operation_name=$1
+    if [ "${FORCE_DANGEROUS}" -ne 1 ]; then
+        log_error "The operation '${operation_name}' is potentially destructive and can lead to data loss. To proceed, you must add the '--force-dangerous-operations' flag. This is a safety measure to prevent accidents."
+    fi
+    log_warn "Proceeding with dangerous operation '${operation_name}'. Ensure you have a backup if necessary."
+}
 
-# --- 2. Initialize Configuration Variables ---
-# Read from environment (which includes sourced file) or safe defaults
-REPO_URL="${GIT_REPO_URL:-}"
-REMOTE_NAME="${GIT_REMOTE_NAME:-origin}"
-REMOTE_BRANCH="${GIT_REMOTE_BRANCH:-main}"
-LOCAL_BRANCH="${GIT_LOCAL_BRANCH:-}"
-LOCAL_DIR="${GIT_LOCAL_DIR:-}"
+check_repo_state() {
+    if [ -d ".git/rebase-merge" ] || [ -d ".git/rebase-apply" ]; then
+        log_error "A rebase is currently in progress. Please resolve or abort it before running this script."
+    fi
+    if [ -f ".git/MERGE_HEAD" ]; then
+        log_error "A merge is currently in progress. Please resolve or abort it before running this script."
+    fi
+    log_info "Repository state is clean."
+}
 
-PULL_STRATEGY="${GIT_PULL_STRATEGY:-merge}"
+# --- Usage Information ---
+usage() {
+    cat <<EOF >&2
+Usage: $0 --sync-method=<method> [options...]
 
-# --- 3. Argument Parsing and Global Variables ---
-SYNC_METHOD=""
-PULL_METHOD=""
-PUSH_METHOD=""
-DRY_RUN=0
-PRUNE=0
-USE_UPSTREAM=0
-FF_ONLY=0 # New Flag
-ATOMIC_PUSH=0 # New Flag
-MERGE_MESSAGE="Automated merge during git_sync.sh operation."
+Description:
+  A powerful script to automate Git synchronization. It supports various pull and push
+  strategies, handles repository initialization, and includes safety features to
+  prevent common issues like race conditions and accidental data loss.
 
-# Process Command-Line Arguments (Highest Priority)
-for arg in "$@"; do
-    case "${arg}" in
-        # Primary Sync Method
-        --sync-method=pull-only) SYNC_METHOD="pull-only" ;;
-        --sync-method=push-only) SYNC_METHOD="push-only" ;;
-        --sync-method=pull-push) SYNC_METHOD="pull-push" ;;
-        --sync-method=init-and-sync) SYNC_METHOD="init-and-sync" ;;
+  For secure authentication, it is highly recommended to use a Git credential helper
+  (https://git-scm.com/docs/git-credential-helpers) instead of embedding credentials
+  in the repository URL.
 
-        # Pull/Push Methods
-        --pull-method=pull) PULL_METHOD="pull" ;;
-        --pull-method=fetch-merge) PULL_METHOD="fetch-merge" ;;
-        --pull-method=fetch-reset) PULL_METHOD="fetch-reset" ;;
-        --pull-method=fetch-rebase) PULL_METHOD="fetch-rebase" ;;
-        --pull-strategy=merge) PULL_STRATEGY="merge" ;;
-        --pull-strategy=rebase) PULL_STRATEGY="rebase" ;;
-        --push-method=default) PUSH_METHOD="default" ;;
-        --push-method=force) PUSH_METHOD="force" ;;
-        --push-method=set-upstream) PUSH_METHOD="set-upstream" ;;
-        
-        # Options
-        --dry-run) DRY_RUN=1 ;;
-        --prune) PRUNE=1 ;;
-        --use-upstream) USE_UPSTREAM=1 ;;
-        --ff-only) FF_ONLY=1 ;; # New Option
-        --atomic-push) ATOMIC_PUSH=1 ;; # New Option
-        --merge-commit-message=*) MERGE_MESSAGE="${arg#*=}" ;;
+Primary Synchronization Methods:
+  --sync-method=<method>    : The main action to perform.
+    - pull-only             : Only pull changes from the remote.
+    - push-only             : Only push changes to the remote.
+    - pull-push             : Pull changes, then push.
+    - init-and-sync         : Clone the repo if it doesn't exist, then perform a pull.
 
-        # Configuration Overrides
-        --repo-url=*) REPO_URL="${arg#*=}" ;;
-        --remote-name=*) REMOTE_NAME="${arg#*=}" ;;
-        --remote-branch=*) REMOTE_BRANCH="${arg#*=}" ;;
-        --local-dir=*) LOCAL_DIR="${arg#*=}" ;;
+Pull Options:
+  --pull-method=<method>    : The strategy for pulling changes.
+    - pull                  : Use 'git pull' with a specified strategy.
+    - fetch-merge           : Fetch and then merge.
+    - fetch-rebase          : Fetch and then rebase.
+    - fetch-reset           : DANGEROUS: Fetch and hard reset to the remote branch.
+  --pull-strategy=<strategy>: 'merge' or 'rebase' (for --pull-method=pull). Default: merge.
+  --ff-only                 : Allow merge only if it can be a fast-forward.
+  --merge-commit-message=<msg>: A custom message for the merge commit (will be sanitized).
 
-        *)
-            # Ignore other arguments
-            ;;
-    esac
-done
+Push Options:
+  --push-method=<method>    : The strategy for pushing changes.
+    - default               : Use 'git push'.
+    - force                 : DANGEROUS: Use 'git push --force-with-lease'.
+    - set-upstream          : Use 'git push -u' to set the upstream tracking branch.
+  --atomic-push             : Push all refs atomically.
 
-# Set the command execution variable
-GIT_CMD=""
-if [ "${DRY_RUN}" -eq 1 ]; then
-    GIT_CMD="echo git"
-    log_warn "DRY RUN MODE ENABLED: Commands will be printed but NOT executed."
-else
-    GIT_CMD="git"
-fi
+General Options:
+  --repo-url=<url>          : The URL of the Git repository.
+  --remote-name=<name>      : The name of the remote (default: origin).
+  --remote-branch=<branch>  : The remote branch to sync with (default: main).
+  --local-dir=<path>        : The local directory to clone into.
+  --use-upstream            : Automatically use the branch's tracking information.
+  --prune                   : Prune stale remote-tracking branches during fetch/pull.
+  --dry-run                 : Print the git commands that would be executed without running them.
+  --force-dangerous-operations: A required flag to execute 'force' push or 'fetch-reset'.
+  -h, --help                : Display this help message.
+EOF
+    exit 1
+}
 
-# ----------------------------------------------------------------------
-# --- Helper Functions ---
-# ----------------------------------------------------------------------
+# --- Core Functions ---
+load_env_config() {
+    local env_file="git_sync.env"
+    if [ -f "${env_file}" ]; then
+        log_info "Sourcing configuration from ${env_file}"
+        set -a
+        # shellcheck source=/dev/null
+        . "${env_file}"
+        set +a
+    fi
+    REPO_URL="${GIT_REPO_URL:-${REPO_URL}}"
+    REMOTE_NAME="${GIT_REMOTE_NAME:-${REMOTE_NAME}}"
+    REMOTE_BRANCH="${GIT_REMOTE_BRANCH:-${REMOTE_BRANCH}}"
+    LOCAL_BRANCH="${GIT_LOCAL_BRANCH:-${LOCAL_BRANCH}}"
+    LOCAL_DIR="${GIT_LOCAL_DIR:-${LOCAL_DIR}}"
+    PULL_STRATEGY="${GIT_PULL_STRATEGY:-${PULL_STRATEGY}}"
+}
 
-# Function to dynamically set REMOTE_NAME and REMOTE_BRANCH based on upstream tracking
+parse_args() {
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --sync-method=*) SYNC_METHOD="${1#*=}"; shift 1 ;;
+            --pull-method=*) PULL_METHOD="${1#*=}"; shift 1 ;;
+            --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
+            --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
+            --merge-commit-message=*) MERGE_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
+            --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
+            --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
+            --local-dir=*) LOCAL_DIR="${1#*=}"; shift 1 ;;
+            --dry-run) DRY_RUN=1; shift 1 ;;
+            --prune) PRUNE=1; shift 1 ;;
+            --use-upstream) USE_UPSTREAM=1; shift 1 ;;
+            --ff-only) FF_ONLY=1; shift 1 ;;
+            --atomic-push) ATOMIC_PUSH=1; shift 1 ;;
+            --force-dangerous-operations) FORCE_DANGEROUS=1; shift 1 ;;
+            -h|--help) usage ;;
+            *) log_error "Unknown option: $1. Use -h or --help for usage information.";;
+        esac
+    done
+}
+
 set_upstream_config() {
     if [ "${USE_UPSTREAM}" -eq 1 ]; then
-        log_info "Option --use-upstream detected. Dynamically determining tracking branch..."
+        log_info "Using --use-upstream to determine tracking branch..."
         local upstream_ref
-        # Use a subshell to prevent set -e from exiting if rev-parse fails
-        upstream_ref=$( "${GIT_CMD}" rev-parse --symbolic-full-name --abbrev-ref "${LOCAL_BRANCH}@{u}" 2>/dev/null || true )
-
+        upstream_ref=$(${GIT_CMD} rev-parse --symbolic-full-name --abbrev-ref "@{u}" 2>/dev/null || echo "")
         if [ -z "${upstream_ref}" ]; then
-            log_error "Local branch '${LOCAL_BRANCH}' is not tracking any remote branch. Cannot use --use-upstream."
-            # log_error exits, so return 1 is unreachable.
+            log_error "The current branch is not tracking a remote branch. Cannot use --use-upstream."
         fi
-
-        local detected_remote_name=$(echo "${upstream_ref}" | cut -d/ -f1)
-        local detected_remote_branch=$(echo "${upstream_ref}" | cut -d/ -f2-)
-
-        # Check if the current local branch is actually tracking the detected upstream
-        local current_tracking_info
-        current_tracking_info=$( "${GIT_CMD}" rev-parse --abbrev-ref "${LOCAL_BRANCH}@{u}" 2>/dev/null || true )
-
-        if [ "${current_tracking_info}" != "${detected_remote_name}/${detected_remote_branch}" ]; then
-            log_warn "Local branch '${LOCAL_BRANCH}' is currently tracking '${current_tracking_info}', but --use-upstream detected '${detected_remote_name}/${detected_remote_branch}'.
-         Proceeding with detected upstream. Consider running 'git branch --set-upstream-to=${detected_remote_name}/${detected_remote_branch}' manually."
-        fi
-
-        REMOTE_NAME="${detected_remote_name}"
-        REMOTE_BRANCH="${detected_remote_branch}"
-        log_info "Tracking set to: ${REMOTE_NAME}/${REMOTE_BRANCH}"
+        REMOTE_NAME=$(echo "${upstream_ref}" | cut -d/ -f1)
+        REMOTE_BRANCH=$(echo "${upstream_ref}" | cut -d/ -f2-)
+        log_info "Dynamically set tracking to: ${REMOTE_NAME}/${REMOTE_BRANCH}"
     fi
-    return 0
 }
 
-# Function to perform the PULL operation
-pull_operation() {
-    local pull_method="$1"
-    local prune_flag=""; if [ "${PRUNE}" -eq 1 ]; then prune_flag="--prune"; fi
-    local merge_options=""; if [ "${FF_ONLY}" -eq 1 ]; then merge_options="--ff-only"; fi
-    
-    log_info "--- PULL Operation (Method: ${pull_method}) ---"
-
-    case "${pull_method}" in
-        pull)
-            local pull_strategy_option=""
-            if [ "${PULL_STRATEGY}" == "rebase" ]; then
-                pull_strategy_option="--rebase"
-            elif [ "${PULL_STRATEGY}" == "merge" ]; then
-                pull_strategy_option="--no-rebase"
-            else
-                log_error "Invalid pull strategy '${PULL_STRATEGY}'. Must be 'merge' or 'rebase'."
-                # log_error exits, so return 1 is unreachable.
-            fi
-            log_info "Executing: ${GIT_CMD} pull ${prune_flag} ${merge_options} ${pull_strategy_option} ${REMOTE_NAME} ${REMOTE_BRANCH}:${LOCAL_BRANCH}"
-            "${GIT_CMD}" pull ${prune_flag} ${merge_options} ${pull_strategy_option} "${REMOTE_NAME}" "${REMOTE_BRANCH}":"${LOCAL_BRANCH}"
-            ;;
-
-        fetch-merge)
-            log_info "Phase 1/2: Executing: ${GIT_CMD} fetch ${prune_flag} ${REMOTE_NAME} ${REMOTE_BRANCH}"
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-
-            log_info "Phase 2/2: Executing: ${GIT_CMD} merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" ${REMOTE_NAME}/${REMOTE_BRANCH}"
-            # Use a subshell for merge to allow aborting without exiting due to set -e
-            if ! ( "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" "${REMOTE_NAME}/${REMOTE_BRANCH}" ); then
-                if [ "${FF_ONLY}" -eq 1 ]; then
-                    log_error "Merge failed due to --ff-only. Local branch has diverged. Resolve manually."
-                else
-                    log_warn "Merge failed. Attempting to abort merge to clean up..."
-                    "${GIT_CMD}" merge --abort > /dev/null 2>&1 || true # true to prevent set -e from exiting if abort fails
-                fi
-                return 1
-            fi
-            ;;
-
-        fetch-rebase)
-            log_info "Phase 1/2: Executing: ${GIT_CMD} fetch ${prune_flag} ${REMOTE_NAME} ${REMOTE_BRANCH}"
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-
-            log_info "Phase 2/2: Executing: ${GIT_CMD} rebase ${REMOTE_NAME}/${REMOTE_BRANCH}"
-            if ! ( "${GIT_CMD}" rebase "${REMOTE_NAME}/${REMOTE_BRANCH}" ); then
-                log_error "Rebase failed. Local work is preserved. Run 'git rebase --abort' or resolve conflicts manually."
-                # log_error exits, so return 1 is unreachable.
-            fi
-            ;;
-
-        fetch-reset)
-            log_info "Phase 1/2: Executing: ${GIT_CMD} fetch ${prune_flag} ${REMOTE_NAME} ${REMOTE_BRANCH}"
-            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            log_info "Phase 2/2: Executing: ${GIT_CMD} reset --hard ${REMOTE_NAME}/${REMOTE_BRANCH}"
-            "${GIT_CMD}" reset --hard "${REMOTE_NAME}/${REMOTE_BRANCH}"
-            ;;
-
-        *)
-            log_error "Invalid pull method '${pull_method}'."
-            # log_error exits, so return 1 is unreachable.
-            ;;
-    esac
-    
-    log_info "PULL Operation completed successfully."
-    return 0
-}
-
-# Function to perform the PUSH operation
-push_operation() {
-    local push_method="$1"
-    local atomic_flag=""; if [ "${ATOMIC_PUSH}" -eq 1 ]; then atomic_flag="--atomic"; fi
-    log_info "--- PUSH Operation (Method: ${push_method}) ---"
-
-    local push_options=""
-    case "${push_method}" in
-        default) push_options=""; ;;
-        force) push_options="--force-with-lease"; log_warn "Attempting to overwrite remote history."; ;;
-        set-upstream) push_options="-u"; ;;
-        *) log_error "Invalid push method '${push_method}'."; # log_error exits, so return 1 is unreachable.
-    esac
-
-    log_info "Executing: ${GIT_CMD} push ${atomic_flag} ${push_options} ${REMOTE_NAME} ${LOCAL_BRANCH}:${REMOTE_BRANCH}"
-    "${GIT_CMD}" push ${atomic_flag} ${push_options} "${REMOTE_NAME}" "${LOCAL_BRANCH}":"${REMOTE_BRANCH}"
-    
-    log_info "PUSH Operation completed successfully."
-    return 0
-}
-
-# Function to perform the CLONE operation
+# --- Git Operations ---
 clone_operation() {
     log_info "--- CLONE Operation ---"
-    local target_dir="${LOCAL_DIR}"
-    if [ -z "${target_dir}" ]; then target_dir=$(basename "${REPO_URL}" .git); fi
-
-    if [ -d "${target_dir}" ] && [ -d "${target_dir}/.git" ]; then
-        log_info "Local directory '${target_dir}' already exists and is a Git repo. Skipping clone."
-        if [ -n "${LOCAL_BRANCH}" ]; then
-            # Check if LOCAL_BRANCH exists in the existing repo before checking it out
-            if "${GIT_CMD}" rev-parse --verify "${LOCAL_BRANCH}" >/dev/null 2>&1; then
-                log_info "Checking out existing local branch '${LOCAL_BRANCH}'."
-                "${GIT_CMD}" checkout "${LOCAL_BRANCH}" > /dev/null 2>&1
-            else
-                log_warn "Local branch '${LOCAL_BRANCH}' does not exist in '${target_dir}'. Staying on current branch."
-            fi
-        fi
-        cd "${target_dir}" || log_error "Failed to enter '${target_dir}'."
-        return 0
+    local target_dir="${LOCAL_DIR:-$(basename "${REPO_URL}" .git)}"
+    if [ -d "${target_dir}/.git" ]; then
+        log_info "Git repository already exists in '${target_dir}'. Skipping clone."
+        cd "${target_dir}" || log_error "Failed to enter directory '${target_dir}'."
+        return
     fi
-
-    log_info "Executing: ${GIT_CMD} clone -b ${REMOTE_BRANCH} ${REPO_URL} ${target_dir}"
+    log_info "Cloning '${REPO_URL}' into '${target_dir}'"
     "${GIT_CMD}" clone -b "${REMOTE_BRANCH}" "${REPO_URL}" "${target_dir}"
-    
-    cd "${target_dir}" || log_error "Failed to enter '${target_dir}'."
-    log_info "CLONE Operation completed successfully."
-    return 0
+    cd "${target_dir}" || log_error "Failed to enter directory '${target_dir}'."
 }
 
-# ----------------------------------------------------------------------
-# --- Main Execution Flow ---
-# ----------------------------------------------------------------------
+pull_operation() {
+    log_info "--- PULL Operation (Method: ${PULL_METHOD}) ---"
+    check_repo_state
+    local prune_flag=""
+    [ "${PRUNE}" -eq 1 ] && prune_flag="--prune"
+    local merge_options=""
+    [ "${FF_ONLY}" -eq 1 ] && merge_options="--ff-only"
 
-# 4. Check for required SYNC_METHOD and proceed with initialization
-if [ -z "${SYNC_METHOD}" ]; then
-    log_error "Missing required argument --sync-method."
-fi
+    case "${PULL_METHOD}" in
+        pull)
+            "${GIT_CMD}" pull ${prune_flag} ${merge_options} --${PULL_STRATEGY} "${REMOTE_NAME}" "${REMOTE_BRANCH}:${LOCAL_BRANCH}"
+            ;;
+        fetch-merge)
+            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+                "${GIT_CMD}" merge --abort || log_warn "git merge --abort failed. The repository may be in a conflicted state."
+                log_error "Merge conflict occurred. Please resolve it manually."
+            fi
+            ;;
+        fetch-rebase)
+            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            if ! "${GIT_CMD}" rebase "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+                "${GIT_CMD}" rebase --abort || log_warn "git rebase --abort failed. The repository may be in a conflicted state."
+                log_error "Rebase conflict occurred. Please resolve it manually."
+            fi
+            ;;
+        fetch-reset)
+            confirm_dangerous_operation "fetch-reset"
+            "${GIT_CMD}" fetch ${prune_flag} "${REMOTE_NAME}" "${REMOTE_BRANCH}"
+            "${GIT_CMD}" reset --hard "${REMOTE_NAME}/${REMOTE_BRANCH}"
+            ;;
+        *) log_error "Invalid pull method: '${PULL_METHOD}'.";;
+    esac
+    log_info "PULL operation completed."
+}
 
-if [ "${SYNC_METHOD}" == "init-and-sync" ]; then
-    if [ -z "${REPO_URL}" ]; then
-        log_error "REPO_URL is required for init-and-sync. Set the GIT_REPO_URL variable or use --repo-url."
+push_operation() {
+    log_info "--- PUSH Operation (Method: ${PUSH_METHOD}) ---"
+    check_repo_state
+    local atomic_flag=""
+    [ "${ATOMIC_PUSH}" -eq 1 ] && atomic_flag="--atomic"
+    local push_options=""
+
+    case "${PUSH_METHOD}" in
+        default) push_options="";;
+        force)
+            confirm_dangerous_operation "force push"
+            push_options="--force-with-lease"
+            ;;
+        set-upstream) push_options="-u";;
+        *) log_error "Invalid push method: '${PUSH_METHOD}'.";;
+    esac
+    "${GIT_CMD}" push ${atomic_flag} ${push_options} "${REMOTE_NAME}" "${LOCAL_BRANCH}:${REMOTE_BRANCH}"
+    log_info "PUSH operation completed."
+}
+
+# --- Main Execution ---
+main() {
+    acquire_lock
+    load_env_config
+    parse_args "$@"
+
+    if [ "${DRY_RUN}" -eq 1 ]; then
+        GIT_CMD="echo git"
+        log_warn "DRY RUN MODE ENABLED: Commands will be printed but not executed."
     fi
-    # Execute clone and subsequent operations in a subshell to isolate directory changes
-    (clone_operation && PULL_METHOD="${PULL_METHOD:-fetch-merge}" && SYNC_METHOD="pull-only")
-    # If clone_operation or subsequent commands in subshell fail, the script will exit due to set -e
-fi
 
-# 5. Validation checks
-if ! "${GIT_CMD}" rev-parse --is-inside-work-tree > /dev/null 2>&1 && [ "${DRY_RUN}" -eq 0 ]; then
-    log_error "Not inside a Git working directory. Use --sync-method=init-and-sync if necessary."
-fi
-
-if [ -z "${LOCAL_BRANCH}" ]; then
-    LOCAL_BRANCH="$("${GIT_CMD}" rev-parse --abbrev-ref HEAD)"
-    # If rev-parse fails, it means we are not in a git repo or HEAD is detached.
-    # With set -e, this would exit. We need to handle it gracefully for dry-run.
-    if [ "$?" -ne 0 ] && [ "${DRY_RUN}" -eq 0 ]; then
-        log_error "Could not determine the current local branch. Are you in a Git repository?"
+    if [ -z "${SYNC_METHOD}" ]; then
+        log_error "Missing required argument --sync-method. Use --help for more information."
     fi
+
+    if [ "${SYNC_METHOD}" == "init-and-sync" ]; then
+        if [ -z "${REPO_URL}" ]; then
+            log_error "REPO_URL is required for init-and-sync. Set it in git_sync.env or use --repo-url."
+        fi
+        clone_operation
+    fi
+
+    if [ "${DRY_RUN}" -eq 0 ]; then
+        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            log_error "Not inside a Git repository. Use --sync-method=init-and-sync to clone a new repository."
+        fi
+        check_repo_state
+    fi
+
+    if [ -z "${LOCAL_BRANCH}" ]; then
+        if git symbolic-ref -q HEAD >/dev/null; then
+            LOCAL_BRANCH=$(${GIT_CMD} rev-parse --abbrev-ref HEAD)
+        else
+            log_warn "Detached HEAD state detected. Operations will be limited and push is disabled."
+            LOCAL_BRANCH=$(${GIT_CMD} rev-parse HEAD) # Get commit hash for context
+            if [[ "${SYNC_METHOD}" =~ "push" ]]; then
+                log_error "Push operations are disabled in a detached HEAD state."
+            fi
+        fi
+    fi
+
+    set_upstream_config
+
+    if [[ "${SYNC_METHOD}" =~ "pull" ]] && [ -z "${PULL_METHOD}" ]; then
+        log_error "--pull-method is required for sync method '${SYNC_METHOD}'."
+    fi
+    if [[ "${SYNC_METHOD}" =~ "push" ]] && [ -z "${PUSH_METHOD}" ]; then
+        log_error "--push-method is required for sync method '${SYNC_METHOD}'."
+    fi
+
+    log_info "SYNC Starting: ${SYNC_METHOD}"
+    log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
+
+    case "${SYNC_METHOD}" in
+        pull-only) pull_operation;;
+        push-only) push_operation;;
+        pull-push)
+            pull_operation
+            log_info "Pull complete, proceeding with push."
+            push_operation
+            ;;
+        init-and-sync)
+            if [ -n "${PULL_METHOD}" ]; then
+                log_info "Initial clone/setup complete, proceeding with configured pull method."
+                pull_operation
+            else
+                log_info "Initial clone/setup complete. No pull method specified, so no further action will be taken."
+            fi
+            ;;
+        *) log_error "Invalid sync method '${SYNC_METHOD}'.";;
+    esac
+
+    log_info "Synchronization process finished successfully."
+}
+
+if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
+    main "$@"
 fi
-
-if ! set_upstream_config; then exit 1; fi
-
-if ( [ "${SYNC_METHOD}" == "pull-only" ] || [ "${SYNC_METHOD}" == "pull-push" ] ) && [ -z "${PULL_METHOD}" ]; then
-    log_error "--pull-method is required for '${SYNC_METHOD}'."
-fi
-if ( [ "${SYNC_METHOD}" == "push-only" ] || [ "${SYNC_METHOD}" == "pull-push" ] ) && [ -z "${PUSH_METHOD}" ]; then
-    log_error "--push-method is required for '${SYNC_METHOD}'."
-fi
-
-log_info "SYNC: Synchronization starting..."
-log_info "Configuration: Local Branch=${LOCAL_BRANCH}, Remote=${REMOTE_NAME}/${REMOTE_BRANCH}"
-log_info "Mode: ${SYNC_METHOD}"
-log_info "Options: DryRun=${DRY_RUN}, Prune=${PRUNE}, UseUpstream=${USE_UPSTREAM}, FFOnly=${FF_ONLY}, AtomicPush=${ATOMIC_PUSH}, PullStrategy=${PULL_STRATEGY}"
-log_info "---------------------------------------------------"
-
-# 6. Execute based on SYNC_METHOD
-case "${SYNC_METHOD}" in
-    pull-only) pull_operation "${PULL_METHOD}" ;;
-    push-only) push_operation "${PUSH_METHOD}" ;;
-    pull-push)
-        pull_operation "${PULL_METHOD}"
-        log_info "Pull completed. Proceeding with Push."
-        push_operation "${PUSH_METHOD}"
-        ;;
-    *) log_error "Invalid sync method provided.";;
-esac
-
-log_info "---------------------------------------------------"
-log_info "Synchronization process finished."
