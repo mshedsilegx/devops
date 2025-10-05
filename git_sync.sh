@@ -373,6 +373,7 @@ main() {
     esac
 
     log_info "Synchronization process finished successfully."
+    exit 0
 }
 
 if [ "${BASH_SOURCE[0]}" == "${0}" ]; then
