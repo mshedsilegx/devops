@@ -43,7 +43,7 @@ The script's behavior is controlled through a series of command-line arguments.
 | `--repo-url=<url>`             | The URL of the Git repository (required for `clone-and-pull` and `init-and-push`).                        | `string`  | (from `git_sync.env`)                 |
 | `--remote-name=<name>`         | The name of the remote to sync with.                                                                    | `string`  | `origin`                              |
 | `--remote-branch=<branch>`     | The remote branch to sync with.                                                                         | `string`  | `main`                                |
-| `--local-dir=<path>`           | The local directory to clone into.                                                                      | `string`  | (repo name from URL)                  |
+| `--local-dir=<path>`           | The target directory. For `clone-and-pull`, this is the clone destination. For other methods, it's the working directory. | `string`  | (repo name from URL)                  |
 | `--use-upstream`               | Automatically use the branch's tracking information for remote name and branch.                         | `flag`    | (disabled)                            |
 | `--prune`                      | Prune stale remote-tracking branches during fetch or pull.                                              | `flag`    | (disabled)                            |
 | `--ff-only`                    | Allow a merge only if it can be resolved as a fast-forward.                                             | `flag`    | (disabled)                            |

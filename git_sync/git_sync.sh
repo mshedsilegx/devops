@@ -158,7 +158,7 @@ General Options:
   --repo-url=<url>          : The URL of the Git repository.
   --remote-name=<name>      : The name of the remote (default: origin).
   --remote-branch=<branch>  : The remote branch to sync with (default: main).
-  --local-dir=<path>        : The local directory to clone into.
+  --local-dir=<path>        : For most operations, the script will change to this directory before execution. For 'clone-and-pull', this is the directory where the repository will be cloned.
   --use-upstream            : Automatically use the branch's tracking information.
   --prune                   : Prune stale remote-tracking branches during fetch/pull.
   --dry-run                 : Print the git commands that would be executed without running them.
@@ -383,6 +383,18 @@ push_operation() {
 main() {
     load_env_config
     parse_args "$@"
+
+    # Handle --local-dir as a generic working directory for most operations
+    if [ -n "${LOCAL_DIR}" ] && [ "${SYNC_METHOD}" != "clone-and-pull" ]; then
+        if [ ! -d "${LOCAL_DIR}" ]; then
+            # Before logging is set up, we must output to stderr directly
+            echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - The specified local directory does not exist: ${LOCAL_DIR}" >&2
+            exit 1
+        fi
+        # We also need to output this info message to stderr before logging is set up
+        echo "INFO: $(date +'%Y-%m-%d %H:%M:%S') - Changing working directory to ${LOCAL_DIR}" >&2
+        cd "${LOCAL_DIR}" || { echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Failed to change directory to ${LOCAL_DIR}" >&2; exit 1; }
+    fi
 
     setup_logging
 
