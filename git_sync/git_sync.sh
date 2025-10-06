@@ -19,6 +19,7 @@ LOCAL_BRANCH=""
 LOCAL_DIR=""
 PULL_STRATEGY="merge"
 MERGE_MESSAGE="Automated git merge"
+INITIAL_COMMIT_MESSAGE="Initial commit"
 
 SYNC_METHOD=""
 PULL_METHOD=""
@@ -134,6 +135,7 @@ Primary Synchronization Methods:
     - push-only             : Only push changes to the remote.
     - pull-push             : Pull changes, then push.
     - init-and-sync         : Clone the repo if it doesn't exist, then perform a pull.
+    - init-and-push         : Initialize a new local repo and push it to an empty remote.
 
 Pull Options:
   --pull-method=<method>    : The strategy for pulling changes.
@@ -192,6 +194,7 @@ parse_args() {
             --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
             --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
             --merge-commit-message=*) MERGE_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --initial-commit-message=*) INITIAL_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
             --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
             --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
             --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
@@ -234,6 +237,59 @@ clone_operation() {
     log_info "Cloning '${REPO_URL}' into '${target_dir}'"
     "${GIT_CMD}" clone --branch "${REMOTE_BRANCH}" -- "${REPO_URL}" "${target_dir}"
     cd "${target_dir}" || log_error "Failed to enter directory '${target_dir}'."
+}
+
+init_and_push_operation() {
+    log_info "--- INIT & PUSH Operation ---"
+
+    if [ -z "${REPO_URL}" ]; then
+        log_error "REPO_URL is required for init-and-push. Set it in git_sync.env or use --repo-url."
+    fi
+
+    if [ ! -d ".git" ]; then
+        log_info "Initializing a new Git repository..."
+        "${GIT_CMD}" init
+    else
+        log_warn "This directory is already a Git repository."
+    fi
+
+    # Check for local branch, default to main if not set
+    if [ -z "${LOCAL_BRANCH}" ]; then
+        # Check current branch, if not exists, checkout to a new one
+        if ! git symbolic-ref -q HEAD >/dev/null; then
+             log_info "No branch found, creating branch '${REMOTE_BRANCH}'."
+             "${GIT_CMD}" checkout -b "${REMOTE_BRANCH}"
+        fi
+        LOCAL_BRANCH=$("${GIT_CMD}" rev-parse --abbrev-ref HEAD)
+    fi
+
+    if ! ("${GIT_CMD}" remote | grep -q "^${REMOTE_NAME}$"); then
+        log_info "Adding remote '${REMOTE_NAME}' with URL '${REPO_URL}'"
+        "${GIT_CMD}" remote add "${REMOTE_NAME}" "${REPO_URL}"
+    else
+        log_info "Remote '${REMOTE_NAME}' already exists. Ensuring URL is correct."
+        "${GIT_CMD}" remote set-url "${REMOTE_NAME}" "${REPO_URL}"
+    fi
+
+    log_info "Staging all files..."
+    "${GIT_CMD}" add .
+
+    if ! "${GIT_CMD}" diff --staged --quiet; then
+        log_info "Creating commit with message: '${INITIAL_COMMIT_MESSAGE}'"
+        "${GIT_CMD}" commit -m "${INITIAL_COMMIT_MESSAGE}"
+    else
+        log_info "No changes to commit. If this is a new repository, it might be empty."
+    fi
+
+    if ! git rev-parse --quiet --verify HEAD >/dev/null; then
+        log_warn "No commits found. Nothing to push."
+        return
+    fi
+
+    log_info "Pushing local branch '${LOCAL_BRANCH}' to remote '${REMOTE_NAME}/${REMOTE_BRANCH}'..."
+    "${GIT_CMD}" push --set-upstream "${REMOTE_NAME}" "${LOCAL_BRANCH}:${REMOTE_BRANCH}"
+
+    log_info "INIT & PUSH operation completed."
 }
 
 pull_operation() {
@@ -318,15 +374,27 @@ main() {
         clone_operation
     fi
 
-    # From this point, we expect to be inside a Git repository.
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        log_error "Not inside a Git repository. For initial cloning, use --sync-method=init-and-sync."
+    # From this point, we expect to be inside a Git repository for most operations.
+    if [ "${SYNC_METHOD}" != "init-and-push" ] && ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log_error "Not inside a Git repository. For initial cloning, use --sync-method=init-and-sync or for creating a new one use --sync-method=init-and-push."
     fi
 
     # --- LOCKING & STATE CHECK ---
     if [ "${DRY_RUN}" -eq 0 ]; then
         local lock_dir
-        lock_dir=$(get_lock_dir_path)
+        if [ "${SYNC_METHOD}" == "init-and-push" ]; then
+            # In init-and-push, the .git dir might not exist, so we can't rely on git rev-parse
+            # We will create a lock based on the current directory path
+            local lock_base_path
+            lock_base_path=$(pwd)
+            local repo_identifier
+            repo_identifier=$(echo -n "${lock_base_path}" | md5sum | cut -d' ' -f1)
+            local temp_dir
+            temp_dir=$(get_temp_dir)
+            lock_dir="${temp_dir}/git_sync_${repo_identifier}.lockdir"
+        else
+            lock_dir=$(get_lock_dir_path)
+        fi
 
         # Attempt to acquire the lock. If it fails, another instance is running.
         if ! acquire_lock "${lock_dir}"; then
@@ -336,13 +404,15 @@ main() {
         # If the script exits for any reason from this point on, the trap will release the lock.
         trap 'release_lock "${lock_dir}"' EXIT SIGINT SIGTERM
 
-        check_repo_state
+        if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+            check_repo_state
+        fi
     fi
 
     if [ -z "${LOCAL_BRANCH}" ]; then
-        if git symbolic-ref -q HEAD >/dev/null; then
+        if git symbolic-ref -q HEAD >/dev/null 2>&1; then
             LOCAL_BRANCH=$(${GIT_CMD} rev-parse --abbrev-ref HEAD)
-        else
+        elif [ "${SYNC_METHOD}" != "init-and-push" ]; then
             log_warn "Detached HEAD state detected. Operations will be limited and push is disabled."
             LOCAL_BRANCH=$(${GIT_CMD} rev-parse HEAD) # Get commit hash for context
             if [[ "${SYNC_METHOD}" =~ "push" ]]; then
@@ -351,17 +421,21 @@ main() {
         fi
     fi
 
-    set_upstream_config
+    if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+        set_upstream_config
+    fi
 
     if [[ "${SYNC_METHOD}" =~ "pull" ]] && [ -z "${PULL_METHOD}" ]; then
         log_error "--pull-method is required for sync method '${SYNC_METHOD}'."
     fi
-    if [[ "${SYNC_METHOD}" =~ "push" ]] && [ -z "${PUSH_METHOD}" ]; then
+    if [[ "${SYNC_METHOD}" =~ "push" ]] && [ -z "${PUSH_METHOD}" ] && [ "${SYNC_METHOD}" != "init-and-push" ]; then
         log_error "--push-method is required for sync method '${SYNC_METHOD}'."
     fi
 
     log_info "SYNC Starting: ${SYNC_METHOD}"
-    log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
+    if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+        log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
+    fi
 
     case "${SYNC_METHOD}" in
         pull-only)
@@ -382,6 +456,9 @@ main() {
             else
                 log_info "Initial clone/setup complete. No pull method specified, so no further action will be taken."
             fi
+            ;;
+        init-and-push)
+            init_and_push_operation || log_error "The init-and-push operation failed. Please check the output above."
             ;;
         *) log_error "Invalid sync method '${SYNC_METHOD}'.";;
     esac
