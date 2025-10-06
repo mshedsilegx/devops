@@ -115,6 +115,36 @@ Force the local `feature` branch to match the remote `feature` branch exactly, d
   --force-dangerous-operations
 ```
 
+### Using the `--local-dir` Argument
+
+The `--local-dir` argument is a flexible option that changes its behavior based on the sync method.
+
+**1. As a Working Directory (Most Methods)**
+
+For methods like `pull-and-push`, `push-only`, or `init-and-push`, you can use `--local-dir` to specify the repository's location, allowing you to run the script from anywhere.
+
+```bash
+# Run a pull-and-push on a repository located at /home/user/projects/my-app
+# without having to 'cd' into it first.
+./git_sync.sh \
+  --sync-method=pull-and-push \
+  --pull-method=fetch-merge \
+  --local-dir=/home/user/projects/my-app
+```
+
+**2. As a Clone Destination (`clone-and-pull`)**
+
+When using `clone-and-pull`, `--local-dir` specifies the exact directory where the repository will be cloned *into*.
+
+```bash
+# Clone a repository into the specific directory /var/www/my-new-project
+./git_sync.sh \
+  --sync-method=clone-and-pull \
+  --repo-url=git@github.com:my-user/my-new-project.git \
+  --local-dir=/var/www/my-new-project \
+  --pull-method=fetch-merge
+```
+
 ### Using the `git_sync.env` Configuration File
 
 You can set default configurations in a `git_sync.env` file in the same directory as the script.
