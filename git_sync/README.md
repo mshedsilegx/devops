@@ -41,8 +41,7 @@ The script's behavior is controlled through a series of command-line arguments.
 | `--pull-method=<method>`       | The strategy for pulling: `pull`, `fetch-merge`, `fetch-rebase`, `fetch-reset`.                         | `string`  | (none)                                |
 | `--push-method=<method>`       | The strategy for pushing: `default`, `force`, `set-upstream`.                                           | `string`  | (none)                                |
 | `--pull-strategy=<strategy>`   | The strategy for the `pull` method: `merge` or `rebase`.                                                | `string`  | `merge`                               |
-| `--merge-commit-message=<msg>` | A custom message for the merge commit (will be sanitized).                                              | `string`  | `Automated merge by git_sync.sh`      |
-| `--repo-url=<url>`             | The URL of the Git repository (required for `init-and-sync`).                                           | `string`  | (from `git_sync.env`)                 |
+| `--repo-url=<url>`             | The URL of the Git repository (required for `clone-and-pull` and `init-and-push`).                        | `string`  | (from `git_sync.env`)                 |
 | `--remote-name=<name>`         | The name of the remote to sync with.                                                                    | `string`  | `origin`                              |
 | `--remote-branch=<branch>`     | The remote branch to sync with.                                                                         | `string`  | `main`                                |
 | `--local-dir=<path>`           | The local directory to clone into.                                                                      | `string`  | (repo name from URL)                  |
@@ -50,6 +49,7 @@ The script's behavior is controlled through a series of command-line arguments.
 | `--prune`                      | Prune stale remote-tracking branches during fetch or pull.                                              | `flag`    | (disabled)                            |
 | `--ff-only`                    | Allow a merge only if it can be resolved as a fast-forward.                                             | `flag`    | (disabled)                            |
 | `--atomic-push`                | Push all refs atomically.                                                                               | `flag`    | (disabled)                            |
+| `--custom-commit-message=<msg>`| A custom message for any commit made by the script (e.g., merge, initial).                              | `string`  | `Automated commit`                    |
 | `--dry-run`                    | Print the git commands that would be executed without running them.                                     | `flag`    | (disabled)                            |
 | `--force-dangerous-operations` | A required safety flag to execute `force` push or `fetch-reset`.                                        | `flag`    | (disabled)                            |
 | `-h`, `--help`                 | Display the help message.                                                                               | `flag`    | (disabled)                            |
@@ -128,7 +128,7 @@ GIT_REMOTE_BRANCH="develop"
 Now you can run the script with fewer arguments:
 ```bash
 # Clones the repo from the URL in the .env file and pulls from the 'develop' branch
-./git_sync.sh --sync-method=init-and-sync --pull-method=fetch-merge
+./git_sync.sh --sync-method=clone-and-pull --pull-method=fetch-merge
 ```
 
 ## 5. In-Depth Option Explanations

@@ -18,8 +18,7 @@ REMOTE_BRANCH="main"
 LOCAL_BRANCH=""
 LOCAL_DIR=""
 PULL_STRATEGY="merge"
-MERGE_MESSAGE="Automated git merge"
-INITIAL_COMMIT_MESSAGE="Initial commit"
+CUSTOM_COMMIT_MESSAGE="Automated commit"
 
 SYNC_METHOD=""
 PULL_METHOD=""
@@ -145,7 +144,6 @@ Pull Options:
     - fetch-reset           : DANGEROUS: Fetch and hard reset to the remote branch.
   --pull-strategy=<strategy>: 'merge' or 'rebase' (for --pull-method=pull). Default: merge.
   --ff-only                 : Allow merge only if it can be a fast-forward.
-  --merge-commit-message=<msg>: A custom message for the merge commit (will be sanitized).
 
 Push Options:
   --push-method=<method>    : The strategy for pushing changes.
@@ -155,6 +153,7 @@ Push Options:
   --atomic-push             : Push all refs atomically.
 
 General Options:
+  --custom-commit-message=<msg>: A custom message for any commit made by the script (merge, initial, etc.).
   --repo-url=<url>          : The URL of the Git repository.
   --remote-name=<name>      : The name of the remote (default: origin).
   --remote-branch=<branch>  : The remote branch to sync with (default: main).
@@ -193,8 +192,7 @@ parse_args() {
             --pull-method=*) PULL_METHOD="${1#*=}"; shift 1 ;;
             --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
             --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
-            --merge-commit-message=*) MERGE_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
-            --initial-commit-message=*) INITIAL_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --custom-commit-message=*) CUSTOM_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
             --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
             --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
             --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
@@ -275,8 +273,8 @@ init_and_push_operation() {
     "${GIT_CMD}" add .
 
     if ! "${GIT_CMD}" diff --staged --quiet; then
-        log_info "Creating commit with message: '${INITIAL_COMMIT_MESSAGE}'"
-        "${GIT_CMD}" commit -m "${INITIAL_COMMIT_MESSAGE}"
+        log_info "Creating commit with message: '${CUSTOM_COMMIT_MESSAGE}'"
+        "${GIT_CMD}" commit -m "${CUSTOM_COMMIT_MESSAGE}"
     else
         log_info "No changes to commit. If this is a new repository, it might be empty."
     fi
@@ -306,7 +304,7 @@ pull_operation() {
             ;;
         fetch-merge)
             "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${CUSTOM_COMMIT_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
                 "${GIT_CMD}" merge --abort || log_warn "git merge --abort failed. The repository may be in a conflicted state."
                 log_error "Merge conflict occurred. Please resolve it manually."
             fi
