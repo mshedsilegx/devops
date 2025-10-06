@@ -17,12 +17,13 @@ REMOTE_NAME="origin"
 REMOTE_BRANCH="main"
 LOCAL_BRANCH=""
 LOCAL_DIR=""
-PULL_STRATEGY="merge"
-MERGE_MESSAGE="Automated git merge"
+CUSTOM_COMMIT_MESSAGE="Automated commit"
 
 SYNC_METHOD=""
 PULL_METHOD=""
 PUSH_METHOD=""
+LOG_FILE=""
+LOG_CONSOLE=0
 DRY_RUN=0
 PRUNE=0
 USE_UPSTREAM=0
@@ -132,18 +133,16 @@ Primary Synchronization Methods:
   --sync-method=<method>    : The main action to perform.
     - pull-only             : Only pull changes from the remote.
     - push-only             : Only push changes to the remote.
-    - pull-push             : Pull changes, then push.
-    - init-and-sync         : Clone the repo if it doesn't exist, then perform a pull.
+    - pull-and-push         : Pull changes, then push.
+    - clone-and-pull        : Clone the repo if it doesn't exist, then perform a pull.
+    - init-and-push         : Initialize a new local repo and push it to an empty remote.
 
 Pull Options:
   --pull-method=<method>    : The strategy for pulling changes.
-    - pull                  : Use 'git pull' with a specified strategy.
     - fetch-merge           : Fetch and then merge.
     - fetch-rebase          : Fetch and then rebase.
     - fetch-reset           : DANGEROUS: Fetch and hard reset to the remote branch.
-  --pull-strategy=<strategy>: 'merge' or 'rebase' (for --pull-method=pull). Default: merge.
   --ff-only                 : Allow merge only if it can be a fast-forward.
-  --merge-commit-message=<msg>: A custom message for the merge commit (will be sanitized).
 
 Push Options:
   --push-method=<method>    : The strategy for pushing changes.
@@ -153,10 +152,13 @@ Push Options:
   --atomic-push             : Push all refs atomically.
 
 General Options:
+  --log-file=<file>         : Redirect all script output to the specified log file. Defaults to {TMP}/git_sync.log.
+  --log-console             : Display log messages on the console instead of redirecting to a file.
+  --custom-commit-message=<msg>: A custom message for any commit made by the script (merge, initial, etc.).
   --repo-url=<url>          : The URL of the Git repository.
   --remote-name=<name>      : The name of the remote (default: origin).
   --remote-branch=<branch>  : The remote branch to sync with (default: main).
-  --local-dir=<path>        : The local directory to clone into.
+  --local-dir=<path>        : For most operations, the script will change to this directory before execution. For 'clone-and-pull', this is the directory where the repository will be cloned.
   --use-upstream            : Automatically use the branch's tracking information.
   --prune                   : Prune stale remote-tracking branches during fetch/pull.
   --dry-run                 : Print the git commands that would be executed without running them.
@@ -181,7 +183,6 @@ load_env_config() {
     REMOTE_BRANCH="${GIT_REMOTE_BRANCH:-${REMOTE_BRANCH}}"
     LOCAL_BRANCH="${GIT_LOCAL_BRANCH:-${LOCAL_BRANCH}}"
     LOCAL_DIR="${GIT_LOCAL_DIR:-${LOCAL_DIR}}"
-    PULL_STRATEGY="${GIT_PULL_STRATEGY:-${PULL_STRATEGY}}"
 }
 
 parse_args() {
@@ -190,8 +191,9 @@ parse_args() {
             --sync-method=*) SYNC_METHOD="${1#*=}"; shift 1 ;;
             --pull-method=*) PULL_METHOD="${1#*=}"; shift 1 ;;
             --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
-            --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
-            --merge-commit-message=*) MERGE_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --custom-commit-message=*) CUSTOM_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --log-file=*) LOG_FILE="${1#*=}"; shift 1;;
+            --log-console) LOG_CONSOLE=1; shift 1;;
             --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
             --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
             --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
@@ -222,6 +224,41 @@ set_upstream_config() {
     fi
 }
 
+setup_logging() {
+    if [ "${LOG_CONSOLE}" -eq 1 ]; then
+        log_info "Logging to console."
+        return
+    fi
+
+    if [ -z "${LOG_FILE}" ]; then
+        local temp_dir="${TMP:-/tmp}"
+        if [ ! -d "${temp_dir}" ] || [ ! -w "${temp_dir}" ]; then
+            echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - The temporary directory '${temp_dir}' is not a writable directory. Please set TMP to a valid path." >&2
+            exit 1
+        fi
+        LOG_FILE="${temp_dir}/git_sync.log"
+    fi
+
+    local log_dir
+    log_dir=$(dirname "${LOG_FILE}")
+
+    if ! mkdir -p "${log_dir}" 2>/dev/null; then
+        echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Could not create log directory at ${log_dir}." >&2
+        exit 1
+    fi
+
+    if ! touch "${LOG_FILE}" 2>/dev/null || [ ! -w "${LOG_FILE}" ]; then
+        echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Log file is not writable: ${LOG_FILE}" >&2
+        exit 1
+    fi
+
+    # Redirect stdout and stderr to the log file from this point forward
+    exec >> "${LOG_FILE}" 2>&1
+
+    log_info "--- New git_sync.sh execution ---"
+    log_info "Logging is now redirected to ${LOG_FILE}"
+}
+
 # --- Git Operations ---
 clone_operation() {
     log_info "--- CLONE Operation ---"
@@ -236,6 +273,59 @@ clone_operation() {
     cd "${target_dir}" || log_error "Failed to enter directory '${target_dir}'."
 }
 
+init_and_push_operation() {
+    log_info "--- INIT & PUSH Operation ---"
+
+    if [ -z "${REPO_URL}" ]; then
+        log_error "REPO_URL is required for init-and-push. Set it in git_sync.env or use --repo-url."
+    fi
+
+    if [ ! -d ".git" ]; then
+        log_info "Initializing a new Git repository..."
+        "${GIT_CMD}" init
+    else
+        log_warn "This directory is already a Git repository."
+    fi
+
+    # Check for local branch, default to main if not set
+    if [ -z "${LOCAL_BRANCH}" ]; then
+        # Check current branch, if not exists, checkout to a new one
+        if ! git symbolic-ref -q HEAD >/dev/null; then
+             log_info "No branch found, creating branch '${REMOTE_BRANCH}'."
+             "${GIT_CMD}" checkout -b "${REMOTE_BRANCH}"
+        fi
+        LOCAL_BRANCH=$("${GIT_CMD}" rev-parse --abbrev-ref HEAD)
+    fi
+
+    if ! ("${GIT_CMD}" remote | grep -q "^${REMOTE_NAME}$"); then
+        log_info "Adding remote '${REMOTE_NAME}' with URL '${REPO_URL}'"
+        "${GIT_CMD}" remote add "${REMOTE_NAME}" "${REPO_URL}"
+    else
+        log_info "Remote '${REMOTE_NAME}' already exists. Ensuring URL is correct."
+        "${GIT_CMD}" remote set-url "${REMOTE_NAME}" "${REPO_URL}"
+    fi
+
+    log_info "Staging all files..."
+    "${GIT_CMD}" add .
+
+    if ! "${GIT_CMD}" diff --staged --quiet; then
+        log_info "Creating commit with message: '${CUSTOM_COMMIT_MESSAGE}'"
+        "${GIT_CMD}" commit -m "${CUSTOM_COMMIT_MESSAGE}"
+    else
+        log_info "No changes to commit. If this is a new repository, it might be empty."
+    fi
+
+    if ! git rev-parse --quiet --verify HEAD >/dev/null; then
+        log_warn "No commits found. Nothing to push."
+        return
+    fi
+
+    log_info "Pushing local branch '${LOCAL_BRANCH}' to remote '${REMOTE_NAME}/${REMOTE_BRANCH}'..."
+    "${GIT_CMD}" push --set-upstream "${REMOTE_NAME}" "${LOCAL_BRANCH}:${REMOTE_BRANCH}"
+
+    log_info "INIT & PUSH operation completed."
+}
+
 pull_operation() {
     log_info "--- PULL Operation (Method: ${PULL_METHOD}) ---"
     check_repo_state
@@ -245,12 +335,9 @@ pull_operation() {
     [ "${FF_ONLY}" -eq 1 ] && merge_options="--ff-only"
 
     case "${PULL_METHOD}" in
-        pull)
-            "${GIT_CMD}" pull ${prune_flag} ${merge_options} --${PULL_STRATEGY} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}:${LOCAL_BRANCH}"
-            ;;
         fetch-merge)
             "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
-            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${MERGE_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
+            if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${CUSTOM_COMMIT_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
                 "${GIT_CMD}" merge --abort || log_warn "git merge --abort failed. The repository may be in a conflicted state."
                 log_error "Merge conflict occurred. Please resolve it manually."
             fi
@@ -297,6 +384,20 @@ main() {
     load_env_config
     parse_args "$@"
 
+    # Handle --local-dir as a generic working directory for most operations
+    if [ -n "${LOCAL_DIR}" ] && [ "${SYNC_METHOD}" != "clone-and-pull" ]; then
+        if [ ! -d "${LOCAL_DIR}" ]; then
+            # Before logging is set up, we must output to stderr directly
+            echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - The specified local directory does not exist: ${LOCAL_DIR}" >&2
+            exit 1
+        fi
+        # We also need to output this info message to stderr before logging is set up
+        echo "INFO: $(date +'%Y-%m-%d %H:%M:%S') - Changing working directory to ${LOCAL_DIR}" >&2
+        cd "${LOCAL_DIR}" || { echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Failed to change directory to ${LOCAL_DIR}" >&2; exit 1; }
+    fi
+
+    setup_logging
+
     if [ "${DRY_RUN}" -eq 1 ]; then
         GIT_CMD="echo git"
         log_warn "DRY RUN MODE ENABLED: Commands will be printed but not executed."
@@ -311,22 +412,34 @@ main() {
         log_warn "The repository URL appears to contain embedded credentials. For better security, please use a Git credential helper instead."
     fi
 
-    if [ "${SYNC_METHOD}" == "init-and-sync" ]; then
+    if [ "${SYNC_METHOD}" == "clone-and-pull" ]; then
         if [ -z "${REPO_URL}" ]; then
-            log_error "REPO_URL is required for init-and-sync. Set it in git_sync.env or use --repo-url."
+            log_error "REPO_URL is required for clone-and-pull. Set it in git_sync.env or use --repo-url."
         fi
         clone_operation
     fi
 
-    # From this point, we expect to be inside a Git repository.
-    if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        log_error "Not inside a Git repository. For initial cloning, use --sync-method=init-and-sync."
+    # From this point, we expect to be inside a Git repository for most operations.
+    if [ "${SYNC_METHOD}" != "init-and-push" ] && ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        log_error "Not inside a Git repository. For initial cloning, use --sync-method=clone-and-pull or for creating a new one use --sync-method=init-and-push."
     fi
 
     # --- LOCKING & STATE CHECK ---
     if [ "${DRY_RUN}" -eq 0 ]; then
         local lock_dir
-        lock_dir=$(get_lock_dir_path)
+        if [ "${SYNC_METHOD}" == "init-and-push" ]; then
+            # In init-and-push, the .git dir might not exist, so we can't rely on git rev-parse
+            # We will create a lock based on the current directory path
+            local lock_base_path
+            lock_base_path=$(pwd)
+            local repo_identifier
+            repo_identifier=$(echo -n "${lock_base_path}" | md5sum | cut -d' ' -f1)
+            local temp_dir
+            temp_dir=$(get_temp_dir)
+            lock_dir="${temp_dir}/git_sync_${repo_identifier}.lockdir"
+        else
+            lock_dir=$(get_lock_dir_path)
+        fi
 
         # Attempt to acquire the lock. If it fails, another instance is running.
         if ! acquire_lock "${lock_dir}"; then
@@ -336,13 +449,15 @@ main() {
         # If the script exits for any reason from this point on, the trap will release the lock.
         trap 'release_lock "${lock_dir}"' EXIT SIGINT SIGTERM
 
-        check_repo_state
+        if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+            check_repo_state
+        fi
     fi
 
     if [ -z "${LOCAL_BRANCH}" ]; then
-        if git symbolic-ref -q HEAD >/dev/null; then
+        if git symbolic-ref -q HEAD >/dev/null 2>&1; then
             LOCAL_BRANCH=$(${GIT_CMD} rev-parse --abbrev-ref HEAD)
-        else
+        elif [ "${SYNC_METHOD}" != "init-and-push" ]; then
             log_warn "Detached HEAD state detected. Operations will be limited and push is disabled."
             LOCAL_BRANCH=$(${GIT_CMD} rev-parse HEAD) # Get commit hash for context
             if [[ "${SYNC_METHOD}" =~ "push" ]]; then
@@ -351,17 +466,21 @@ main() {
         fi
     fi
 
-    set_upstream_config
+    if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+        set_upstream_config
+    fi
 
     if [[ "${SYNC_METHOD}" =~ "pull" ]] && [ -z "${PULL_METHOD}" ]; then
         log_error "--pull-method is required for sync method '${SYNC_METHOD}'."
     fi
-    if [[ "${SYNC_METHOD}" =~ "push" ]] && [ -z "${PUSH_METHOD}" ]; then
+    if [[ "${SYNC_METHOD}" =~ "push" ]] && [ -z "${PUSH_METHOD}" ] && [ "${SYNC_METHOD}" != "init-and-push" ]; then
         log_error "--push-method is required for sync method '${SYNC_METHOD}'."
     fi
 
     log_info "SYNC Starting: ${SYNC_METHOD}"
-    log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
+    if [ "${SYNC_METHOD}" != "init-and-push" ]; then
+        log_info "Configuration: Local Branch='${LOCAL_BRANCH}', Remote='${REMOTE_NAME}/${REMOTE_BRANCH}'"
+    fi
 
     case "${SYNC_METHOD}" in
         pull-only)
@@ -370,18 +489,21 @@ main() {
         push-only)
             push_operation || log_error "The push operation failed. Please check the output above for details."
             ;;
-        pull-push)
+        pull-and-push)
             pull_operation || log_error "The pull operation failed. Please check the output above for details."
             log_info "Pull complete, proceeding with push."
             push_operation || log_error "The push operation failed. Please check the output above for details."
             ;;
-        init-and-sync)
+        clone-and-pull)
             if [ -n "${PULL_METHOD}" ]; then
                 log_info "Initial clone/setup complete, proceeding with configured pull method."
                 pull_operation || log_error "The pull operation failed. Please check the output above for details."
             else
                 log_info "Initial clone/setup complete. No pull method specified, so no further action will be taken."
             fi
+            ;;
+        init-and-push)
+            init_and_push_operation || log_error "The init-and-push operation failed. Please check the output above."
             ;;
         *) log_error "Invalid sync method '${SYNC_METHOD}'.";;
     esac
