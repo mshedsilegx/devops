@@ -133,7 +133,7 @@ Primary Synchronization Methods:
   --sync-method=<method>    : The main action to perform.
     - pull-only             : Only pull changes from the remote.
     - push-only             : Only push changes to the remote.
-    - pull-push             : Pull changes, then push.
+    - pull-and-push         : Pull changes, then push.
     - clone-and-pull        : Clone the repo if it doesn't exist, then perform a pull.
     - init-and-push         : Initialize a new local repo and push it to an empty remote.
 
@@ -444,7 +444,7 @@ main() {
         push-only)
             push_operation || log_error "The push operation failed. Please check the output above for details."
             ;;
-        pull-push)
+        pull-and-push)
             pull_operation || log_error "The pull operation failed. Please check the output above for details."
             log_info "Pull complete, proceeding with push."
             push_operation || log_error "The push operation failed. Please check the output above for details."
