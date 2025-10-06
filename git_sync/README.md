@@ -38,9 +38,8 @@ The script's behavior is controlled through a series of command-line arguments.
 | Argument                       | Description                                                                                             | Type      | Default                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------- |
 | `--sync-method=<method>`       | The primary action to perform: `pull-only`, `push-only`, `pull-and-push`, `clone-and-pull`, `init-and-push`. | `string`  | (none)                                |
-| `--pull-method=<method>`       | The strategy for pulling: `pull`, `fetch-merge`, `fetch-rebase`, `fetch-reset`.                         | `string`  | (none)                                |
+| `--pull-method=<method>`       | The strategy for pulling: `fetch-merge`, `fetch-rebase`, `fetch-reset`.                                 | `string`  | (none)                                |
 | `--push-method=<method>`       | The strategy for pushing: `default`, `force`, `set-upstream`.                                           | `string`  | (none)                                |
-| `--pull-strategy=<strategy>`   | The strategy for the `pull` method: `merge` or `rebase`.                                                | `string`  | `merge`                               |
 | `--repo-url=<url>`             | The URL of the Git repository (required for `clone-and-pull` and `init-and-push`).                        | `string`  | (from `git_sync.env`)                 |
 | `--remote-name=<name>`         | The name of the remote to sync with.                                                                    | `string`  | `origin`                              |
 | `--remote-branch=<branch>`     | The remote branch to sync with.                                                                         | `string`  | `main`                                |
@@ -143,7 +142,6 @@ Now you can run the script with fewer arguments:
 -   **`init-and-push`**: Initializes a Git repository in the current directory if one does not already exist, adds all files, creates an initial commit, and pushes them to a new or empty remote repository. This is ideal for turning a local project into a new remote repository.
 
 ### Pull Methods (`--pull-method`)
--   **`pull`**: Executes a standard `git pull` command, which is a shorthand for fetching and then merging or rebasing (depending on `--pull-strategy`).
 -   **`fetch-merge`**: A more explicit two-step process. It first runs `git fetch` to retrieve all new data from the remote, then runs `git merge` to integrate the changes. This creates a merge commit if the histories have diverged.
 -   **`fetch-rebase`**: Fetches from the remote and then uses `git rebase` to re-apply local commits on top of the updated remote branch. This results in a linear history but rewrites commit hashes.
 -   **`fetch-reset`**: A **destructive** operation that makes the local branch exactly match the remote branch. It fetches the latest data and then runs `git reset --hard`. Any local commits that have not been pushed will be permanently lost. Requires `--force-dangerous-operations`.
@@ -154,7 +152,6 @@ Now you can run the script with fewer arguments:
 -   **`set-upstream`**: Pushes the current branch and adds the upstream (tracking) reference. This is useful the first time you push a new branch (`git push -u origin <branch>`).
 
 ### Other Important Options
--   **`--pull-strategy=<strategy>`**: Only used with `--pull-method=pull`. It specifies whether to use a `merge` (creates a merge commit) or `rebase` (linear history) strategy when pulling.
 -   **`--prune`**: When fetching, this option removes any remote-tracking references that no longer exist on the remote. It helps keep your local repository clean.
 -   **`--ff-only`**: When merging (with `pull` or `fetch-merge`), this ensures that the merge is only completed if it's a fast-forward. If the branches have diverged, the merge will fail.
 -   **`--atomic-push`**: Ensures that when pushing multiple branches, either all of them are updated on the remote, or none are. This prevents the remote repository from ending up in a partially updated state.

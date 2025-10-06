@@ -17,7 +17,6 @@ REMOTE_NAME="origin"
 REMOTE_BRANCH="main"
 LOCAL_BRANCH=""
 LOCAL_DIR=""
-PULL_STRATEGY="merge"
 CUSTOM_COMMIT_MESSAGE="Automated commit"
 
 SYNC_METHOD=""
@@ -140,11 +139,9 @@ Primary Synchronization Methods:
 
 Pull Options:
   --pull-method=<method>    : The strategy for pulling changes.
-    - pull                  : Use 'git pull' with a specified strategy.
     - fetch-merge           : Fetch and then merge.
     - fetch-rebase          : Fetch and then rebase.
     - fetch-reset           : DANGEROUS: Fetch and hard reset to the remote branch.
-  --pull-strategy=<strategy>: 'merge' or 'rebase' (for --pull-method=pull). Default: merge.
   --ff-only                 : Allow merge only if it can be a fast-forward.
 
 Push Options:
@@ -186,7 +183,6 @@ load_env_config() {
     REMOTE_BRANCH="${GIT_REMOTE_BRANCH:-${REMOTE_BRANCH}}"
     LOCAL_BRANCH="${GIT_LOCAL_BRANCH:-${LOCAL_BRANCH}}"
     LOCAL_DIR="${GIT_LOCAL_DIR:-${LOCAL_DIR}}"
-    PULL_STRATEGY="${GIT_PULL_STRATEGY:-${PULL_STRATEGY}}"
 }
 
 parse_args() {
@@ -195,7 +191,6 @@ parse_args() {
             --sync-method=*) SYNC_METHOD="${1#*=}"; shift 1 ;;
             --pull-method=*) PULL_METHOD="${1#*=}"; shift 1 ;;
             --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
-            --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
             --custom-commit-message=*) CUSTOM_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
             --log-file=*) LOG_FILE="${1#*=}"; shift 1;;
             --log-console) LOG_CONSOLE=1; shift 1;;
@@ -340,9 +335,6 @@ pull_operation() {
     [ "${FF_ONLY}" -eq 1 ] && merge_options="--ff-only"
 
     case "${PULL_METHOD}" in
-        pull)
-            "${GIT_CMD}" pull ${prune_flag} ${merge_options} --${PULL_STRATEGY} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}:${LOCAL_BRANCH}"
-            ;;
         fetch-merge)
             "${GIT_CMD}" fetch ${prune_flag} -- "${REMOTE_NAME}" "${REMOTE_BRANCH}"
             if ! "${GIT_CMD}" merge ${merge_options} --no-edit -m "${CUSTOM_COMMIT_MESSAGE}" -- "${REMOTE_NAME}/${REMOTE_BRANCH}"; then
