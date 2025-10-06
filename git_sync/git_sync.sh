@@ -24,6 +24,7 @@ SYNC_METHOD=""
 PULL_METHOD=""
 PUSH_METHOD=""
 LOG_FILE=""
+LOG_CONSOLE=0
 DRY_RUN=0
 PRUNE=0
 USE_UPSTREAM=0
@@ -155,6 +156,7 @@ Push Options:
 
 General Options:
   --log-file=<file>         : Redirect all script output to the specified log file. Defaults to {TMP}/git_sync.log.
+  --log-console             : Display log messages on the console instead of redirecting to a file.
   --custom-commit-message=<msg>: A custom message for any commit made by the script (merge, initial, etc.).
   --repo-url=<url>          : The URL of the Git repository.
   --remote-name=<name>      : The name of the remote (default: origin).
@@ -196,6 +198,7 @@ parse_args() {
             --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
             --custom-commit-message=*) CUSTOM_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
             --log-file=*) LOG_FILE="${1#*=}"; shift 1;;
+            --log-console) LOG_CONSOLE=1; shift 1;;
             --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
             --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
             --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
@@ -227,6 +230,11 @@ set_upstream_config() {
 }
 
 setup_logging() {
+    if [ "${LOG_CONSOLE}" -eq 1 ]; then
+        log_info "Logging to console."
+        return
+    fi
+
     if [ -z "${LOG_FILE}" ]; then
         local temp_dir="${TMP:-/tmp}"
         if [ ! -d "${temp_dir}" ] || [ ! -w "${temp_dir}" ]; then

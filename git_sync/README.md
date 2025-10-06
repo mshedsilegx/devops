@@ -50,6 +50,7 @@ The script's behavior is controlled through a series of command-line arguments.
 | `--ff-only`                    | Allow a merge only if it can be resolved as a fast-forward.                                             | `flag`    | (disabled)                            |
 | `--atomic-push`                | Push all refs atomically.                                                                               | `flag`    | (disabled)                            |
 | `--log-file=<file>`            | Redirect all script output to the specified log file. Defaults to `{TMP}/git_sync.log`.                 | `string`  | (none)                                |
+| `--log-console`                | Display log messages on the console instead of redirecting to a file.                                   | `flag`    | (disabled)                            |
 | `--custom-commit-message=<msg>`| A custom message for any commit made by the script (e.g., merge, initial).                              | `string`  | `Automated commit`                    |
 | `--dry-run`                    | Print the git commands that would be executed without running them.                                     | `flag`    | (disabled)                            |
 | `--force-dangerous-operations` | A required safety flag to execute `force` push or `fetch-reset`.                                        | `flag`    | (disabled)                            |
