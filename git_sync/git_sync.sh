@@ -134,7 +134,7 @@ Primary Synchronization Methods:
     - pull-only             : Only pull changes from the remote.
     - push-only             : Only push changes to the remote.
     - pull-push             : Pull changes, then push.
-    - init-and-sync         : Clone the repo if it doesn't exist, then perform a pull.
+    - clone-and-pull        : Clone the repo if it doesn't exist, then perform a pull.
     - init-and-push         : Initialize a new local repo and push it to an empty remote.
 
 Pull Options:
@@ -367,16 +367,16 @@ main() {
         log_warn "The repository URL appears to contain embedded credentials. For better security, please use a Git credential helper instead."
     fi
 
-    if [ "${SYNC_METHOD}" == "init-and-sync" ]; then
+    if [ "${SYNC_METHOD}" == "clone-and-pull" ]; then
         if [ -z "${REPO_URL}" ]; then
-            log_error "REPO_URL is required for init-and-sync. Set it in git_sync.env or use --repo-url."
+            log_error "REPO_URL is required for clone-and-pull. Set it in git_sync.env or use --repo-url."
         fi
         clone_operation
     fi
 
     # From this point, we expect to be inside a Git repository for most operations.
     if [ "${SYNC_METHOD}" != "init-and-push" ] && ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-        log_error "Not inside a Git repository. For initial cloning, use --sync-method=init-and-sync or for creating a new one use --sync-method=init-and-push."
+        log_error "Not inside a Git repository. For initial cloning, use --sync-method=clone-and-pull or for creating a new one use --sync-method=init-and-push."
     fi
 
     # --- LOCKING & STATE CHECK ---
@@ -449,7 +449,7 @@ main() {
             log_info "Pull complete, proceeding with push."
             push_operation || log_error "The push operation failed. Please check the output above for details."
             ;;
-        init-and-sync)
+        clone-and-pull)
             if [ -n "${PULL_METHOD}" ]; then
                 log_info "Initial clone/setup complete, proceeding with configured pull method."
                 pull_operation || log_error "The pull operation failed. Please check the output above for details."

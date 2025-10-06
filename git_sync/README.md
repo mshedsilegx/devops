@@ -37,7 +37,7 @@ The script's behavior is controlled through a series of command-line arguments.
 
 | Argument                       | Description                                                                                             | Type      | Default                               |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------- | --------- | ------------------------------------- |
-| `--sync-method=<method>`       | The primary action to perform: `pull-only`, `push-only`, `pull-push`, `init-and-sync`, `init-and-push`.   | `string`  | (none)                                |
+| `--sync-method=<method>`       | The primary action to perform: `pull-only`, `push-only`, `pull-push`, `clone-and-pull`, `init-and-push`.  | `string`  | (none)                                |
 | `--pull-method=<method>`       | The strategy for pulling: `pull`, `fetch-merge`, `fetch-rebase`, `fetch-reset`.                         | `string`  | (none)                                |
 | `--push-method=<method>`       | The strategy for pushing: `default`, `force`, `set-upstream`.                                           | `string`  | (none)                                |
 | `--pull-strategy=<strategy>`   | The strategy for the `pull` method: `merge` or `rebase`.                                                | `string`  | `merge`                               |
@@ -80,13 +80,13 @@ Push local commits to the remote `main` branch.
 ./git_sync.sh --sync-method=push-only --push-method=default --remote-branch=main
 ```
 
-### Initialize a Repository and Sync
+### Clone a Repository and Pull
 
 Clone a new repository if it doesn't exist locally, and then pull the latest changes using a rebase strategy.
 
 ```bash
 ./git_sync.sh \
-  --sync-method=init-and-sync \
+  --sync-method=clone-and-pull \
   --repo-url=git@github.com:my-user/my-repo.git \
   --pull-method=fetch-rebase
 
@@ -137,7 +137,7 @@ Now you can run the script with fewer arguments:
 -   **`pull-only`**: Fetches changes from the remote repository and applies them to the local branch. This is useful for updating a local workspace without pushing any local changes.
 -   **`push-only`**: Pushes local commits to the remote repository. This is useful when you have committed changes locally and want to share them.
 -   **`pull-push`**: The most common workflow. It first pulls changes from the remote to ensure the local branch is up-to-date, then pushes local commits.
--   **`init-and-sync`**: Designed for initial setup. It clones the repository if it doesn't already exist in the specified directory, and then performs a pull operation to ensure it's synchronized.
+-   **`clone-and-pull`**: Designed for initial setup. It clones the repository if it doesn't already exist in the specified directory, and then performs a pull operation to ensure it's synchronized.
 -   **`init-and-push`**: Initializes a Git repository in the current directory if one does not already exist, adds all files, creates an initial commit, and pushes them to a new or empty remote repository. This is ideal for turning a local project into a new remote repository.
 
 ### Pull Methods (`--pull-method`)
