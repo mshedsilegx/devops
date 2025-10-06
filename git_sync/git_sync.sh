@@ -23,6 +23,7 @@ CUSTOM_COMMIT_MESSAGE="Automated commit"
 SYNC_METHOD=""
 PULL_METHOD=""
 PUSH_METHOD=""
+LOG_FILE=""
 DRY_RUN=0
 PRUNE=0
 USE_UPSTREAM=0
@@ -153,6 +154,7 @@ Push Options:
   --atomic-push             : Push all refs atomically.
 
 General Options:
+  --log-file=<file>         : Redirect all script output to the specified log file. Defaults to {TMP}/git_sync.log.
   --custom-commit-message=<msg>: A custom message for any commit made by the script (merge, initial, etc.).
   --repo-url=<url>          : The URL of the Git repository.
   --remote-name=<name>      : The name of the remote (default: origin).
@@ -193,6 +195,7 @@ parse_args() {
             --push-method=*) PUSH_METHOD="${1#*=}"; shift 1 ;;
             --pull-strategy=*) PULL_STRATEGY="${1#*=}"; shift 1 ;;
             --custom-commit-message=*) CUSTOM_COMMIT_MESSAGE=$(sanitize_input "${1#*=}"); shift 1 ;;
+            --log-file=*) LOG_FILE="${1#*=}"; shift 1;;
             --repo-url=*) REPO_URL="${1#*=}"; shift 1 ;;
             --remote-name=*) REMOTE_NAME="${1#*=}"; shift 1 ;;
             --remote-branch=*) REMOTE_BRANCH="${1#*=}"; shift 1 ;;
@@ -221,6 +224,36 @@ set_upstream_config() {
         REMOTE_BRANCH=$(echo "${upstream_ref}" | cut -d/ -f2-)
         log_info "Dynamically set tracking to: ${REMOTE_NAME}/${REMOTE_BRANCH}"
     fi
+}
+
+setup_logging() {
+    if [ -z "${LOG_FILE}" ]; then
+        local temp_dir="${TMP:-/tmp}"
+        if [ ! -d "${temp_dir}" ] || [ ! -w "${temp_dir}" ]; then
+            echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - The temporary directory '${temp_dir}' is not a writable directory. Please set TMP to a valid path." >&2
+            exit 1
+        fi
+        LOG_FILE="${temp_dir}/git_sync.log"
+    fi
+
+    local log_dir
+    log_dir=$(dirname "${LOG_FILE}")
+
+    if ! mkdir -p "${log_dir}" 2>/dev/null; then
+        echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Could not create log directory at ${log_dir}." >&2
+        exit 1
+    fi
+
+    if ! touch "${LOG_FILE}" 2>/dev/null || [ ! -w "${LOG_FILE}" ]; then
+        echo "ERROR: $(date +'%Y-%m-%d %H:%M:%S') - Log file is not writable: ${LOG_FILE}" >&2
+        exit 1
+    fi
+
+    # Redirect stdout and stderr to the log file from this point forward
+    exec >> "${LOG_FILE}" 2>&1
+
+    log_info "--- New git_sync.sh execution ---"
+    log_info "Logging is now redirected to ${LOG_FILE}"
 }
 
 # --- Git Operations ---
@@ -350,6 +383,8 @@ push_operation() {
 main() {
     load_env_config
     parse_args "$@"
+
+    setup_logging
 
     if [ "${DRY_RUN}" -eq 1 ]; then
         GIT_CMD="echo git"
