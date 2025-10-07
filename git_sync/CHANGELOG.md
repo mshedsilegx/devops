@@ -1,13 +1,11 @@
 # Changelog
 
-All notable changes to this project will be aocumented in this file.
+All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [x.x.x] - 2025-10-06
-
-This is the initial public release after a series of significant enhancements.
 
 ### Added
 - **New `init-and-push` Sync Method**: Introduced a new sync method (`--sync-method=init-and-push`) to initialize a Git repository from a local directory and push its contents to a new or empty remote repository. This was the core feature request of the initial task.
