@@ -1,7 +1,7 @@
 #!/var/opt/python314/bin/python3.14
 # ------------------------------------------
 # /var/opt/apps/system/python_sysdiags.py
-# v1.3.5xg  2025/10/15  XdG / MIS Center
+# v1.3.6xg  2025/10/15  XdG / MIS Center
 # ------------------------------------------
 """
 A comprehensive Python script to verify the Python interpreter's build environment,
@@ -252,7 +252,7 @@ def print_text_report(results):
         data = results['tls13']
         print(f"\n----- TLS 1.3 Capability Check -----")
         if data['status'] == 'OK':
-            print(f"TLSVersion.TLSv1_3 constant: 772") # This is a static value in the original, replicating it
+            print(f"TLSVersion.TLSv1_3 constant: {ssl.TLSVersion.TLSv1_3}")
             print("SSLContext successfully created with minimum TLS 1.3 version.")
             print("This confirms active TLS 1.3 support through OpenSSL.")
         else:
