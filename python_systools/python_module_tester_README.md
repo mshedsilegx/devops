@@ -57,3 +57,49 @@ python python_systools/python_module_tester.py --checks-methodology
 ```
 
 This will print the help text and exit without performing any analysis.
+
+## 5. Checks Methodology
+
+This section details the checks performed by the script to assess a module's soundness.
+
+### Status Tags
+
+The script uses the following status tags to summarize the outcome of each check:
+
+| Status Tag | Meaning                                                                              |
+| :--------- | :----------------------------------------------------------------------------------- |
+| `[PASS]`   | The check met a quality standard or represents a desirable state.                    |
+| `[WARN]`   | A potential issue was found that should be reviewed (e.g., a missing best practice). |
+| `[INFO]`   | Provides neutral, contextual information about the module (e.g., dependencies).      |
+| `[FAIL]`   | A critical failure occurred, such as the module failing to import.                   |
+| `[OK]`     | The module was imported successfully.                                                |
+
+### I. Generic Soundness Checks
+
+These checks evaluate the module's structure, documentation, and adherence to common Python best practices.
+
+| #  | Check                           | Purpose                                                                                | Criteria for `[PASS]`, `[WARN]`, `[INFO]`                                                                                                                                                            |
+| :- | :------------------------------ | :------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1  | **File/Package Location**       | Identifies where the module's source code is located on the filesystem.                | **`[PASS]`**: The file or package path was successfully found.<br>**`[INFO]`**: The module is built-in or a C-extension with no visible path.                                                       |
+| 2  | **Implementation Language**     | Determines if the module is written in Python, C, or a mix.                            | **`[PASS]`**: The language type (Pure Python, C-Extension, or Mixed) was identified.<br>**`[INFO]`**: The language type is unknown.                                                                 |
+| 3  | **Documentation String**        | Checks for a descriptive `__doc__` string at the top of the module.                      | **`[PASS]`**: A docstring with a length > 10 characters was found.<br>**`[WARN]`**: The docstring is missing or too short.                                                                          |
+| 4  | **Version Information**         | Checks for a `__version__` attribute for package versioning.                           | **`[PASS]`**: The `__version__` attribute was found.<br>**`[WARN]`**: The module does not define a `__version__`.                                                                                   |
+| 5  | **Public API Definition**       | Checks for an `__all__` list, which explicitly defines the module's public API.          | **`[PASS]`**: `__all__` is present and non-empty.<br>**`[WARN]`**: `__all__` is defined but empty or invalid.<br>**`[INFO]`**: `__all__` is not defined (using default namespace).                      |
+| 6  | **Encapsulation**               | Assesses the balance between public and private members.                               | **`[PASS]`**: Private member ratio is < 70% or there are >= 5 public members.<br>**`[WARN]`**: Private ratio is > 70% and public members are < 5.<br>**`[INFO]`**: The module namespace is empty.      |
+| 7  | **API Surface Size**            | Checks if the module exposes an excessively large number of public members.              | **`[PASS]`**: The number of public members is <= 150.<br>**`[WARN]`**: The API is excessively large (> 150 members).                                                                               |
+| 8  | **Callable Object Count**       | Ensures the module provides usable functionality (functions or classes).                 | **`[PASS]`**: At least one public function or class was found.<br>**`[INFO]`**: No top-level public functions or classes were found.                                                                |
+| 9  | **Import Health**               | Captures any warnings (e.g., `DeprecationWarning`) that occur during import.             | **`[PASS]`**: The module imported cleanly with no warnings.<br>**`[WARN]`**: One or more unique warnings were detected.                                                                          |
+| 10 | **Type Hint Coverage**          | Measures the percentage of public callables that have type annotations.                  | **`[PASS]`**: Excellent coverage (>= 75%).<br>**`[WARN]`**: Moderate coverage (>= 30% but < 75%).<br>**`[INFO]`**: Low coverage (< 30%) or no callables to check.                                    |
+| 11 | **Metadata Status**             | Checks if the module is part of a distributed package with metadata.                     | **`[PASS]`**: Package metadata (name and version) was found.<br>**`[WARN]`**: Metadata was not found or is incomplete.                                                                           |
+| 12 | **License Status**              | Checks for license information within the package metadata.                              | **`[PASS]`**: A license was detected.<br>**`[WARN]`**: The 'License' field is missing.<br>**`[INFO]`**: Could not retrieve package metadata.                                                        |
+| 13 | **Dependencies**                | Lists the external packages required by this module.                                   | **`[PASS]`**: No external dependencies are listed.<br>**`[INFO]`**: External dependencies were found and are listed in the report.                                                                    |
+
+### II. Performance & Environment Checks
+
+These checks measure the module's import time and report details about the execution environment.
+
+| Check                | Purpose                                                                    | Criteria for `[PASS]`, `[WARN]`, `[INFO]`                                                                                                                                                              |
+| :------------------- | :------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Import Performance** | Measures the time it takes to import the module.                           | **`[PASS]`**: Excellent performance (< 0.1 seconds).<br>**`[INFO]`**: Acceptable performance (0.1 to 1.0 seconds).<br>**`[WARN]`**: Slow performance (> 1.0 seconds), indicating a potential bottleneck. |
+| **Environment Check**  | Reports key details about the Python interpreter running the check.        | **`[INFO]`**: Reports the Python version, threading model (GIL status), and implementation (e.g., CPython).                                                                                            |
+This will print the help text and exit without performing any analysis.
