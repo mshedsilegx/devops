@@ -182,39 +182,106 @@ class SystemDiagnostics:
 # Presentation Functions
 # ----------------------------------------
 def print_text_report(results):
-    """Prints the diagnostic results in a human-readable text format."""
-    for section_name, section_data in results.items():
-        print(f"\n----- {section_name.replace('_', ' ').title()} -----")
-        if not isinstance(section_data, dict):
-            print(f"  Error: Invalid data format for section {section_name}")
-            continue
+    """Prints the diagnostic results in a human-readable text format, matching the original script's output."""
+    if 'env' in results:
+        data = results['env']
+        print(f"\n----- Python Interpreter & Environment -----")
+        print(f"Python executable: {data['executable']}")
+        print(f"Python version: {data['version']}")
+        print(f"Python sitelib path (purelib): {data['sitelib_path']}")
+        print(f"Python sitearch path (platlib): {data['sitearch_path']}")
+        print(f"Python system platform: {data['platform']}")
+        print(f"Python default encoding: {data['default_encoding']}")
+        print(f"Python filesystem encoding: {data['filesystem_encoding']}")
+        print("\nPython interpreter flags:")
+        for key, value in data['interpreter_flags'].items():
+            print(f"  - {key}: {value}")
 
-        # Special formatting for resource limits
-        if section_name == 'rlimits' and section_data.get('status') == 'OK':
-            limits = section_data.get('limits', {})
-            for key, values in limits.items():
-                soft, hard = values['soft'], values['hard']
-                if 'gb' in key:
-                    soft = f"{soft / (1024**3):.2f} GB" if isinstance(soft, (int, float)) and soft != -1 else "Unlimited"
-                    hard = f"{hard / (1024**3):.2f} GB" if isinstance(hard, (int, float)) and hard != -1 else "Unlimited"
-                print(f"{key.replace('_', ' ').title()}: {soft} / {hard}")
-            continue
+    if 'build' in results:
+        data = results['build']
+        print(f"\n----- Python Build-Time Configuration -----")
+        print(f"Compiler used (CC): {data['compiler']}")
+        print(f"CFlags (CFLAGS): {data['cflags']}")
+        print(f"LdFlags (LDFLAGS): {data['ldflags']}")
+        print(f"Optimization Level (OPT): {data['optimization_level']}")
+        print(f"Python Debug Build (PYDEBUG): {data['debug_build']}")
+        print(f"PyMALLOC enabled (WITH_PYMALLOC): {data['pymalloc_enabled']}")
+        print(f"Built as Shared Library (PY_ENABLE_SHARED): {data['shared_library']}")
 
-        for key, value in section_data.items():
-            if key == 'status' and value in ['OK', 'Not Available']:
-                if 'details' in section_data: print(section_data['details'])
-                continue
+    if 'paths' in results:
+        data = results['paths']
+        print(f"\n----- Python Module Search Path (sys.path) -----")
+        for i, path in enumerate(data['paths']):
+            print(f"  {i}: {path}")
 
-            if isinstance(value, dict):
-                print(f"{key.replace('_', ' ').title()}:")
-                for sub_key, sub_value in value.items():
-                     print(f"  - {sub_key.replace('_', ' ').title()}: {sub_value}")
-            elif isinstance(value, list):
-                print(f"{key.replace('_', ' ').title()}:")
-                for i, item in enumerate(value):
-                    print(f"  {i}: {item}")
+    if 'stdlib' in results:
+        data = results['stdlib']
+        print(f"\n----- Key Standard Library C-Extensions -----")
+        for name, info in data.items():
+            if info['status'] == 'Found':
+                print(f"  - {name}: Found (from {info['origin']})")
             else:
-                print(f"{key.replace('_', ' ').title()}: {value}")
+                print(f"  - {name}: NOT Found (may indicate missing development libraries during build)", file=sys.stderr)
+
+    if 'math' in results:
+        data = results['math']
+        print(f"\n----- Math Module C-Functionality Check -----")
+        if data['status'] == 'OK':
+            print("math module successfully imported.")
+            print(f"math.sqrt(16) worked: 4.0")
+            print("This indicates math module's core (C) functions are accessible.")
+            print(f"math.__file__: {data['file']}")
+            print(f"math.__loader__: {data['loader']}")
+        else:
+            print(f"Error: {data['details']}", file=sys.stderr)
+
+    if 'ssl' in results:
+        data = results['ssl']
+        print(f"\n----- OpenSSL & SSL Module Information -----")
+        print(f"OpenSSL version Python is using: {data['openssl_version']}")
+        print(f"OpenSSL version number: {data['openssl_version_number']}")
+        print(f"OpenSSL built on: {data['openssl_built_on']}")
+        print(f"OpenSSL TLS v1.2 protocol constant: {data['protocol_tlsv1_2']}")
+        print(f"Highest available client-side TLS protocol (PROTOCOL_TLS_CLIENT): {data['protocol_tls_client']}")
+        print(f"Highest available server-side TLS protocol (PROTOCOL_TLS_SERVER): {data['protocol_tls_server']}")
+        print("\nDefault CA certificate paths (ssl.get_default_verify_paths()):")
+        for key, value in data['default_ca_info'].items():
+             print(f"  - {key.replace('_', ' ').title()}: {value}")
+
+    if 'tls13' in results:
+        data = results['tls13']
+        print(f"\n----- TLS 1.3 Capability Check -----")
+        if data['status'] == 'OK':
+            print(f"TLSVersion.TLSv1_3 constant: 772") # This is a static value in the original, replicating it
+            print("SSLContext successfully created with minimum TLS 1.3 version.")
+            print("This confirms active TLS 1.3 support through OpenSSL.")
+        else:
+            print(f"Error: {data['details']}", file=sys.stderr)
+
+    if 'hashlib' in results:
+        data = results['hashlib']
+        print(f"\n----- Hashlib Functionality Check -----")
+        if data['status'] == 'OK':
+            print("hashlib.blake2b() initialization worked successfully.")
+            print("This confirms OpenSSL's cryptographic hash algorithms are accessible.")
+        else:
+            print(f"Error: {data['details']}", file=sys.stderr)
+
+    if 'rlimits' in results:
+        data = results['rlimits']
+        print(f"\n----- System Resource Limits -----")
+        if data['status'] == 'OK':
+            print(f"Max Open Files (RLIMIT_NOFILE): {data['limits']['max_open_files']['soft']} / {data['limits']['max_open_files']['hard']}")
+            addr_space = data['limits']['address_space_gb']
+            soft, hard = addr_space['soft'], addr_space['hard']
+            soft_gb = f"{soft / (1024**3):.2f} GB" if isinstance(soft, (int, float)) and soft != -1 else "Unlimited"
+            hard_gb = f"{hard / (1024**3):.2f} GB" if isinstance(hard, (int, float)) and hard != -1 else "Unlimited"
+            print(f"Address Space (RLIMIT_AS): {soft_gb} / {hard_gb}")
+            if 'max_processes' in data['limits']:
+                 proc = data['limits']['max_processes']
+                 print(f"Max Processes (RLIMIT_NPROC): {proc['soft']} / {proc['hard']}")
+        else:
+            print(data['details'])
 
 def print_json_report(results):
     """Prints the diagnostic results as a JSON object."""
