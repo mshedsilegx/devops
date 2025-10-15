@@ -46,23 +46,23 @@ I. GENERIC SOUNDNESS CHECKS (1-13)
 
 1.  **File/Package Location**
     - **Purpose:**   Identifies where the module's source code is located on the filesystem.
-    - **[PASS]:**   The file or package path was successfully found.
-    - **[INFO]:**   The module is a built-in part of Python or a C-extension with no visible path.
+    - **[PASS]:**    The file or package path was successfully found.
+    - **[INFO]:**    The module is a built-in part of Python or a C-extension with no visible path.
 
 2.  **Implementation Language Type**
     - **Purpose:**   Determines if the module is written in Python, C, or a mix.
-    - **[PASS]:**   The language type (Pure Python, C-Extension, or Mixed) was identified.
-    - **[INFO]:**   The language type is unknown, often for built-in modules.
+    - **[PASS]:**    The language type (Pure Python, C-Extension, or Mixed) was identified.
+    - **[INFO]:**    The language type is unknown, often for built-in modules.
 
 3.  **Documentation String (__doc__)**
     - **Purpose:**   Checks for a descriptive docstring at the top of the module.
-    - **[PASS]:**   A docstring with a reasonable length (>10 characters) was found.
-    - **[WARN]:**   The docstring is missing or too short to be descriptive.
+    - **[PASS]:**    A docstring with a reasonable length (>10 characters) was found.
+    - **[WARN]:**    The docstring is missing or too short to be descriptive.
 
 4.  **Version Information (__version__)**
     - **Purpose:**   Checks for a `__version__` attribute, a best practice for package versioning.
-    - **[PASS]:**   The `__version__` attribute was found.
-    - **[WARN]:**   The module does not define a `__version__`.
+    - **[PASS]:**    The `__version__` attribute was found.
+    - **[WARN]:**    The module does not define a `__version__`.
 
 5.  **Public API Definition (__all__)**
     - **Purpose:**   Checks for an `__all__` list, which explicitly defines the module's public API.
@@ -72,46 +72,46 @@ I. GENERIC SOUNDNESS CHECKS (1-13)
 
 6.  **Object Definition Quality/Encapsulation**
     - **Purpose:**   Assesses the balance between public and private (underscore-prefixed) members.
-    - **[PASS]:**   The ratio of private members is reasonable (<70%) or there are enough public members (>=5).
-    - **[WARN]:**   The API may be poorly encapsulated, with a high private member ratio (>70%) and very few public members (<5).
-    - **[INFO]:**   The module namespace is empty (contains no members to analyze).
+    - **[PASS]:**    The ratio of private members is reasonable (<70%) or there are enough public members (>=5).
+    - **[WARN]:**    The API may be poorly encapsulated, with a high private member ratio (>70%) and very few public members (<5).
+    - **[INFO]:**    The module namespace is empty (contains no members to analyze).
 
 7.  **Public API Surface Size**
     - **Purpose:**   Checks if the module exposes an excessively large number of public members.
-    - **[PASS]:**   The number of public members is reasonable (<= 150).
-    - **[WARN]:**   The API is excessively large (> 150 members) and may be a candidate for refactoring.
+    - **[PASS]:**    The number of public members is reasonable (<= 150).
+    - **[WARN]:**    The API is excessively large (> 150 members) and may be a candidate for refactoring.
 
 8.  **Callable Object Count**
     - **Purpose:**   Ensures the module provides usable functionality (functions or classes).
-    - **[PASS]:**   At least one public function or class was found.
-    - **[INFO]:**   No top-level public functions or classes were found.
+    - **[PASS]:**    At least one public function or class was found.
+    - **[INFO]:**    No top-level public functions or classes were found.
 
 9.  **Import Health (Warnings/Deprecations)**
     - **Purpose:**   Captures any warnings (e.g., `DeprecationWarning`) that occur during import.
-    - **[PASS]:**   The module imported cleanly with no warnings.
-    - **[WARN]:**   One or more unique warnings were detected during import.
+    - **[PASS]:**    The module imported cleanly with no warnings.
+    - **[WARN]:**    One or more unique warnings were detected during import.
 
 10. **Type Hint Coverage**
     - **Purpose:**   Measures the percentage of public functions/classes that have type annotations.
-    - **[PASS]:**   Excellent coverage (>= 75%).
-    - **[WARN]:**   Moderate coverage (>= 30% but < 75%).
-    - **[INFO]:**   Low coverage (< 30%) or no callables to analyze.
+    - **[PASS]:**    Excellent coverage (>= 75%).
+    - **[WARN]:**    Moderate coverage (>= 30% but < 75%).
+    - **[INFO]:**    Low coverage (< 30%) or no callables to analyze.
 
 11. **Distribution Metadata Status**
     - **Purpose:**   Checks if the module is part of a distributed package with metadata.
-    - **[PASS]:**   Package metadata (name and version) was found successfully.
-    - **[WARN]:**   The package was not found in the distribution database or its metadata is incomplete.
+    - **[PASS]:**    Package metadata (name and version) was found successfully.
+    - **[WARN]:**    The package was not found in the distribution database or its metadata is incomplete.
 
 12. **License Status**
     - **Purpose:**   Checks for license information within the package metadata.
-    - **[PASS]:**   A license was detected in the package metadata.
-    - **[WARN]:**   The 'License' field is missing from the metadata.
-    - **[INFO]:**   Could not retrieve package metadata to check for a license.
+    - **[PASS]:**    A license was detected in the package metadata.
+    - **[WARN]:**    The 'License' field is missing from the metadata.
+    - **[INFO]:**    Could not retrieve package metadata to check for a license.
 
 13. **Required Dependencies**
     - **Purpose:**   Lists the external packages required by this module.
-    - **[PASS]:**   The module has no external dependencies listed in its metadata.
-    - **[INFO]:**   External dependencies were found and are listed in the report.
+    - **[PASS]:**    The module has no external dependencies listed in its metadata.
+    - **[INFO]:**    External dependencies were found and are listed in the report.
 
 ----------------------------------------
 II. PERFORMANCE & ENVIRONMENT CHECKS
@@ -119,13 +119,13 @@ II. PERFORMANCE & ENVIRONMENT CHECKS
 
 **Import Performance**
 - **Purpose:**   Measures the time it takes to import the module.
-- **[PASS]:**   Excellent performance (< 0.1 seconds).
-- **[INFO]:**   Acceptable performance (0.1 to 1.0 seconds).
-- **[WARN]:**   Slow performance (> 1.0 seconds), indicating a potential startup bottleneck.
+- **[PASS]:**    Excellent performance (< 0.1 seconds).
+- **[INFO]:**    Acceptable performance (0.1 to 1.0 seconds).
+- **[WARN]:**    Slow performance (> 1.0 seconds), indicating a potential startup bottleneck.
 
 **Environment Check**
 - **Purpose:**   Reports key details about the Python interpreter running the check.
-- **[INFO]:**   Reports the Python version, threading model (GIL status), and implementation (CPython, PyPy, etc.).
+- **[INFO]:**    Reports the Python version, threading model (GIL status), and implementation (CPython, PyPy, etc.).
 """
     print(doc)
     sys.exit(0)

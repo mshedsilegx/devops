@@ -1,0 +1,85 @@
+  - _curses: NOT Found (may indicate missing development libraries during build)
+  - _gdbm: NOT Found (may indicate missing development libraries during build)
+
+----- Python Interpreter & Environment -----
+Python executable: d:\dev\python314\python.exe
+Python version: 3.14.0 (tags/v3.14.0:ebf955d, Oct  7 2025, 10:15:03) [MSC v.1944 64 bit (AMD64)]
+Python sitelib path (purelib): d:\dev\python314\Lib\site-packages
+Python sitearch path (platlib): d:\dev\python314\Lib\site-packages
+Python system platform: win32
+Python default encoding: utf-8
+Python filesystem encoding: utf-8
+
+Python interpreter flags:
+  - gil: 1
+  - hash_randomization: 1
+  - int_max_str_digits: 4300
+  - n_fields: 21
+  - n_sequence_fields: 18
+
+----- Python Build-Time Configuration -----
+Compiler used (CC): N/A
+CFlags (CFLAGS): N/A
+LdFlags (LDFLAGS): N/A
+Optimization Level (OPT): N/A
+Python Debug Build (PYDEBUG): N/A
+PyMALLOC enabled (WITH_PYMALLOC): N/A
+Built as Shared Library (PY_ENABLE_SHARED): N/A
+
+----- Python Module Search Path (sys.path) -----
+  0: e:\data\devel\build\code\private\devops\python_systools
+  1: d:\dev\python314\python314.zip
+  2: d:\dev\python314\DLLs
+  3: d:\dev\python314\Lib
+  4: d:\dev\python314
+  5: d:\dev\python314\Lib\site-packages
+
+----- Key Standard Library C-Extensions -----
+  - zlib: Found (from built-in)
+  - _bz2: Found (from d:\dev\python314\DLLs\_bz2.pyd)
+  - _lzma: Found (from d:\dev\python314\DLLs\_lzma.pyd)
+  - _sqlite3: Found (from d:\dev\python314\DLLs\_sqlite3.pyd)
+  - _json: Found (from built-in)
+  - _socket: Found (from d:\dev\python314\DLLs\_socket.pyd)
+  - _io: Found (from built-in)
+  - _datetime: Found (from built-in)
+  - _csv: Found (from built-in)
+  - _elementtree: Found (from d:\dev\python314\DLLs\_elementtree.pyd)
+  - _collections: Found (from built-in)
+  - _thread: Found (from built-in)
+  - _multiprocessing: Found (from d:\dev\python314\DLLs\_multiprocessing.pyd)
+  - _zstd: Found (from d:\dev\python314\DLLs\_zstd.pyd)
+
+----- Math Module C-Functionality Check -----
+math module successfully imported.
+math.sqrt(16) worked: 4.0
+This indicates math module's core (C) functions are accessible.
+math.__file__: N/A (Built-in)
+math.__loader__: <class '_frozen_importlib.BuiltinImporter'>
+
+----- OpenSSL & SSL Module Information -----
+OpenSSL version Python is using: OpenSSL 3.0.18 30 Sep 2025
+OpenSSL version number: 805306656
+OpenSSL built on: N/A (OPENSSL_BUILT_ON not available in this Python version)
+OpenSSL TLS v1.2 protocol constant: 5
+Highest available client-side TLS protocol (PROTOCOL_TLS_CLIENT): 16
+Highest available server-side TLS protocol (PROTOCOL_TLS_SERVER): 17
+
+Default CA certificate paths (ssl.get_default_verify_paths()):
+  - CA file: None
+  - CA path: None
+  - SSL certificate file: N/A (Attribute not available)
+  - SSL certificate path: N/A (Attribute not available)
+  - SSL key file: N/A (Attribute not available)
+
+----- TLS 1.3 Capability Check -----
+TLSVersion.TLSv1_3 constant: 772
+SSLContext successfully created with minimum TLS 1.3 version.
+This confirms active TLS 1.3 support through OpenSSL.
+
+----- Hashlib Functionality Check -----
+hashlib.blake2b() initialization worked successfully.
+This confirms OpenSSL's cryptographic hash algorithms are accessible.
+
+----- System Resource Limits -----
+Resource module not available (typically on Windows systems).
