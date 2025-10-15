@@ -131,6 +131,10 @@ II. PERFORMANCE & ENVIRONMENT CHECKS
     sys.exit(0)
 
 def print_report(results: List[Dict[str, Any]]):
+    # ----------------------------------------
+    # Presentation Logic
+    # ----------------------------------------
+
     """
     Prints the analysis results in a structured, one-line-per-test format.
 
@@ -203,6 +207,9 @@ def print_environment_check():
         print("   [WARN] Environment Info: Failed to retrieve interpreter version or details.")
 
 class ModuleAnalysis:
+    # ----------------------------------------
+    # Core Analysis Logic
+    # ----------------------------------------
     """
     A class to perform a comprehensive analysis of a Python module's soundness.
     It separates the analysis logic from the presentation (printing) logic.
@@ -210,6 +217,8 @@ class ModuleAnalysis:
     def __init__(self, module_name: str):
         """
         Initializes the analysis by importing the module and gathering key data.
+        This constructor acts as the main entry point for the analysis, orchestrating
+        the import and initial data gathering steps.
         
         Args:
             module_name (str): The name of the module to analyze.
@@ -510,6 +519,7 @@ class ModuleAnalysis:
     def run_all_checks(self) -> List[Dict[str, Any]]:
         """
         Runs all the analysis checks in sequence and returns the collected results.
+        This method orchestrates the execution of all individual checks.
         
         Returns:
             A list of dictionaries, where each dictionary represents the result of a check.
@@ -536,6 +546,9 @@ class ModuleAnalysis:
         return results
 
 if __name__ == "__main__":
+    # ----------------------------------------
+    # Main Execution Block
+    # ----------------------------------------
     
     parser = argparse.ArgumentParser(
         description="Check if a specified Python module can be imported successfully and assess its generic soundness.",
