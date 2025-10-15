@@ -21,49 +21,111 @@ import os
 
 def print_methodology_doc():
     """Prints the comprehensive documentation for the soundness checks and rating systems."""
-    # Using r""" for a raw string literal to prevent SyntaxWarning 
-    # about invalid escape sequences like "\l" in the LaTeX math symbols ($\le, \gt$).
     doc = r"""
 ========================================
-MODULE SOUNDNESS CHECK METHODOLOGY
+PYTHON MODULE TESTER - METHODOLOGY
 ========================================
 
-The script uses four main status tags to quickly summarize the module's health 
-across several dimensions: [PASS], [WARN], [INFO], and [FAIL].
+This document explains the checks performed by the script to assess a module's
+generic soundness, performance, and environment.
 
-| Status Tag | Meaning |
-| :--- | :--- |
-| [PASS] | The check passed the quality standard or represents a desirable state. |
-| [WARN] | A potential issue was found that you should review (e.g., missing best practice). |
-| [INFO] | A neutral finding, providing context about the module's nature (e.g., built-in, dependencies). |
-| [FAIL]/[OK] | Used for the global import status (OK for success, FAIL for import failure). |
+----------------------------------------
+STATUS TAGS
+----------------------------------------
+The script uses four main status tags to summarize the module's health:
 
----
-EXPLANATIONS FOR GENERIC SOUNDNESS CHECKS (1-13)
----
-| Check | What It Measures | [PASS] Criteria | [WARN] Criteria | [INFO] Criteria |
-| :--- | :--- | :--- | :--- | :--- |
-| 1. File/Package Location | Where the module resides. | File or package path found. | N/A | Built-in or C-Extension. |
-| 2. Language Type | Pure Python, C-Extension, or Mixed. | Specific type (Pure, C, or Mixed) identified. | N/A | Built-in or Unknown. |
-| 3. Documentation String | Presence of top-level `__doc__`. | Docstring found (length > 10). | Docstring missing or too short. | N/A |
-| 4. Version Information | Presence of top-level `__version__`. | `__version__` attribute found. | `__version__` is missing. | N/A |
-| 5. Public API (`__all__`) | Explicit control over the public interface. | `__all__` list is present and non-empty. | `__all__` is defined but empty or invalid. | `__all__` is not defined (default namespace). |
-| 6. Encapsulation | Balance of private vs. public members. | Private member ratio is **reasonable** (< 70% or >= 5 public members). | Private ratio **> 70%** AND public members **< 5**. | Module namespace is empty. |
-| 7. API Surface Size | Whether the public API exposes too many members. | Public members $\le 150$. | Public members $\gt 150$ (Excessive size). | N/A |
-| 8. Callable Object Count | Existence of functions or classes in the public API. | At least one public function or class found. | N/A | No top-level public functions or classes found. |
-| 9. Import Health | Warnings caught during import (e.g., DeprecationWarning). | No warnings or deprecations detected. | One or more unique warnings detected. | N/A |
-| 10. Type Hint Coverage | Proportion of public callables with type hints. | **Excellent** ($\ge 75\%$ coverage). | **Moderate** ($\ge 30\%$ but $< 75\%$ coverage). | **Low** ($< 30\%$ coverage) or no callables to check. |
-| 11. Metadata Status | Package information via `importlib.metadata`. | Name and Version metadata found. | Metadata missing or incomplete. | N/A |
-| 12. License Status | License information in package metadata. | License information detected. | 'License' field missing in metadata. | Could not retrieve package metadata. |
-| 13. Dependencies | External packages required by the module. | No external package dependencies listed. | N/A | External dependencies found and listed. |
+[PASS]  Indicates the check met a quality standard or represents a desirable state.
+[WARN]  Highlights a potential issue that should be reviewed (e.g., a missing best practice).
+[INFO]  Provides neutral, contextual information about the module (e.g., dependencies found).
+[FAIL]  Indicates a critical failure, such as the module failing to import.
+[OK]    Indicates a successful import of the module.
 
----
-PERFORMANCE AND ENVIRONMENT CHECKS
----
-| Check | What It Measures | [PASS] Criteria | [INFO] Criteria | [WARN] Criteria |
-| :--- | :--- | :--- | :--- | :--- |
-| Import Performance | Time to load the module (in seconds). | **Excellent** ($< 0.1$ s). | **Acceptable** ($0.1$ s to $1.0$ s). | **Slow** ($> 1.0$ s - Potential bottleneck). |
-| Environment Check | Python version and interpreter details. | N/A | Reports Version, Threading Model, and Implementation. | Failed to retrieve details. |
+----------------------------------------
+I. GENERIC SOUNDNESS CHECKS (1-13)
+----------------------------------------
+
+1.  **File/Package Location**
+    - **Purpose:**   Identifies where the module's source code is located on the filesystem.
+    - **[PASS]:**   The file or package path was successfully found.
+    - **[INFO]:**   The module is a built-in part of Python or a C-extension with no visible path.
+
+2.  **Implementation Language Type**
+    - **Purpose:**   Determines if the module is written in Python, C, or a mix.
+    - **[PASS]:**   The language type (Pure Python, C-Extension, or Mixed) was identified.
+    - **[INFO]:**   The language type is unknown, often for built-in modules.
+
+3.  **Documentation String (__doc__)**
+    - **Purpose:**   Checks for a descriptive docstring at the top of the module.
+    - **[PASS]:**   A docstring with a reasonable length (>10 characters) was found.
+    - **[WARN]:**   The docstring is missing or too short to be descriptive.
+
+4.  **Version Information (__version__)**
+    - **Purpose:**   Checks for a `__version__` attribute, a best practice for package versioning.
+    - **[PASS]:**   The `__version__` attribute was found.
+    - **[WARN]:**   The module does not define a `__version__`.
+
+5.  **Public API Definition (__all__)**
+    - **Purpose:**   Checks for an `__all__` list, which explicitly defines the module's public API.
+    - **[PASS]:**   `__all__` is present and contains one or more members.
+    - **[WARN]:**   `__all__` is defined but is empty or not a valid list.
+    - **[INFO]:**   `__all__` is not defined, so the default public namespace is used.
+
+6.  **Object Definition Quality/Encapsulation**
+    - **Purpose:**   Assesses the balance between public and private (underscore-prefixed) members.
+    - **[PASS]:**   The ratio of private members is reasonable (<70%) or there are enough public members (>=5).
+    - **[WARN]:**   The API may be poorly encapsulated, with a high private member ratio (>70%) and very few public members (<5).
+    - **[INFO]:**   The module namespace is empty (contains no members to analyze).
+
+7.  **Public API Surface Size**
+    - **Purpose:**   Checks if the module exposes an excessively large number of public members.
+    - **[PASS]:**   The number of public members is reasonable (<= 150).
+    - **[WARN]:**   The API is excessively large (> 150 members) and may be a candidate for refactoring.
+
+8.  **Callable Object Count**
+    - **Purpose:**   Ensures the module provides usable functionality (functions or classes).
+    - **[PASS]:**   At least one public function or class was found.
+    - **[INFO]:**   No top-level public functions or classes were found.
+
+9.  **Import Health (Warnings/Deprecations)**
+    - **Purpose:**   Captures any warnings (e.g., `DeprecationWarning`) that occur during import.
+    - **[PASS]:**   The module imported cleanly with no warnings.
+    - **[WARN]:**   One or more unique warnings were detected during import.
+
+10. **Type Hint Coverage**
+    - **Purpose:**   Measures the percentage of public functions/classes that have type annotations.
+    - **[PASS]:**   Excellent coverage (>= 75%).
+    - **[WARN]:**   Moderate coverage (>= 30% but < 75%).
+    - **[INFO]:**   Low coverage (< 30%) or no callables to analyze.
+
+11. **Distribution Metadata Status**
+    - **Purpose:**   Checks if the module is part of a distributed package with metadata.
+    - **[PASS]:**   Package metadata (name and version) was found successfully.
+    - **[WARN]:**   The package was not found in the distribution database or its metadata is incomplete.
+
+12. **License Status**
+    - **Purpose:**   Checks for license information within the package metadata.
+    - **[PASS]:**   A license was detected in the package metadata.
+    - **[WARN]:**   The 'License' field is missing from the metadata.
+    - **[INFO]:**   Could not retrieve package metadata to check for a license.
+
+13. **Required Dependencies**
+    - **Purpose:**   Lists the external packages required by this module.
+    - **[PASS]:**   The module has no external dependencies listed in its metadata.
+    - **[INFO]:**   External dependencies were found and are listed in the report.
+
+----------------------------------------
+II. PERFORMANCE & ENVIRONMENT CHECKS
+----------------------------------------
+
+**Import Performance**
+- **Purpose:**   Measures the time it takes to import the module.
+- **[PASS]:**   Excellent performance (< 0.1 seconds).
+- **[INFO]:**   Acceptable performance (0.1 to 1.0 seconds).
+- **[WARN]:**   Slow performance (> 1.0 seconds), indicating a potential startup bottleneck.
+
+**Environment Check**
+- **Purpose:**   Reports key details about the Python interpreter running the check.
+- **[INFO]:**   Reports the Python version, threading model (GIL status), and implementation (CPython, PyPy, etc.).
 """
     print(doc)
     sys.exit(0)
