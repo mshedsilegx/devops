@@ -130,6 +130,9 @@ class SystemDiagnostics:
             "default_ca_info": {
                 "ca_file": default_paths.cafile,
                 "ca_path": default_paths.capath,
+                "ssl_cert_file": getattr(default_paths, 'ssl_cert_file', 'N/A'),
+                "ssl_cert_dir": getattr(default_paths, 'ssl_cert_dir', 'N/A'),
+                "ssl_key_file": getattr(default_paths, 'ssl_key_file', 'N/A')
             }
         }
 
@@ -184,6 +187,17 @@ def print_text_report(results):
         print(f"\n----- {section_name.replace('_', ' ').title()} -----")
         if not isinstance(section_data, dict):
             print(f"  Error: Invalid data format for section {section_name}")
+            continue
+
+        # Special formatting for resource limits
+        if section_name == 'rlimits' and section_data.get('status') == 'OK':
+            limits = section_data.get('limits', {})
+            for key, values in limits.items():
+                soft, hard = values['soft'], values['hard']
+                if 'gb' in key:
+                    soft = f"{soft / (1024**3):.2f} GB" if isinstance(soft, (int, float)) and soft != -1 else "Unlimited"
+                    hard = f"{hard / (1024**3):.2f} GB" if isinstance(hard, (int, float)) and hard != -1 else "Unlimited"
+                print(f"{key.replace('_', ' ').title()}: {soft} / {hard}")
             continue
 
         for key, value in section_data.items():
