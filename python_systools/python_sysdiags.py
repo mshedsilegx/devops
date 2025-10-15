@@ -49,7 +49,13 @@ try:
 except ImportError:
     resource = None # Will be None on Windows
 
-# ----- Section Functions -----
+# ----------------------------------------
+# Diagnostic Section Functions
+# ----------------------------------------
+# Each function in this section is responsible for a single, modular
+# diagnostic check. They print a formatted header and then the relevant
+# system or Python interpreter information.
+# ----------------------------------------
 
 def print_python_env_details():
     """Prints Python Interpreter & Environment details."""
@@ -210,8 +216,15 @@ def print_system_resource_limits():
         print("Resource module not available (typically on Windows systems).")
 
 
-# ----- Main Execution Logic -----
+# ----------------------------------------
+# Main Execution Logic
+# ----------------------------------------
+
 def main():
+    """
+    Parses command-line arguments and orchestrates the execution of the
+    selected diagnostic functions.
+    """
     # ----- Strict Python Version Check -----
     # Ensure the script is run with Python 3.10 or newer.
     if sys.version_info < (3, 10):
@@ -220,6 +233,8 @@ def main():
         sys.exit(1)
 
     # --- Argument Parsing ---
+    # Sets up the command-line interface, defining all the flags that
+    # correspond to the diagnostic sections.
     parser = argparse.ArgumentParser(
         description="Verify Python and OpenSSL environment.",
         formatter_class=argparse.RawTextHelpFormatter # Preserve formatting in description/help
@@ -240,7 +255,9 @@ def main():
     # Determine if any specific section argument was provided
     run_all = not any([args.env, args.build, args.paths, args.stdlib, args.math, args.ssl, args.tls13, args.hashlib, args.rlimits]) or args.all
 
-    # ----- Conditional Section Execution -----
+    # --- Conditional Section Execution ---
+    # Runs the appropriate diagnostic functions based on the parsed command-line
+    # arguments. If no specific flags are set, it defaults to running all checks.
     if run_all or args.env:
         print_python_env_details()
     if run_all or args.build:

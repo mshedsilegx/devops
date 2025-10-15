@@ -21,117 +21,283 @@ import os
 
 def print_methodology_doc():
     """Prints the comprehensive documentation for the soundness checks and rating systems."""
-    # Using r""" for a raw string literal to prevent SyntaxWarning 
-    # about invalid escape sequences like "\l" in the LaTeX math symbols ($\le, \gt$).
     doc = r"""
 ========================================
-MODULE SOUNDNESS CHECK METHODOLOGY
+PYTHON MODULE TESTER - METHODOLOGY
 ========================================
 
-The script uses four main status tags to quickly summarize the module's health 
-across several dimensions: [PASS], [WARN], [INFO], and [FAIL].
+This document explains the checks performed by the script to assess a module's
+generic soundness, performance, and environment.
 
-| Status Tag | Meaning |
-| :--- | :--- |
-| [PASS] | The check passed the quality standard or represents a desirable state. |
-| [WARN] | A potential issue was found that you should review (e.g., missing best practice). |
-| [INFO] | A neutral finding, providing context about the module's nature (e.g., built-in, dependencies). |
-| [FAIL]/[OK] | Used for the global import status (OK for success, FAIL for import failure). |
+----------------------------------------
+STATUS TAGS
+----------------------------------------
+The script uses four main status tags to summarize the module's health:
 
----
-EXPLANATIONS FOR GENERIC SOUNDNESS CHECKS (1-13)
----
-| Check | What It Measures | [PASS] Criteria | [WARN] Criteria | [INFO] Criteria |
-| :--- | :--- | :--- | :--- | :--- |
-| 1. File/Package Location | Where the module resides. | File or package path found. | N/A | Built-in or C-Extension. |
-| 2. Language Type | Pure Python, C-Extension, or Mixed. | Specific type (Pure, C, or Mixed) identified. | N/A | Built-in or Unknown. |
-| 3. Documentation String | Presence of top-level `__doc__`. | Docstring found (length > 10). | Docstring missing or too short. | N/A |
-| 4. Version Information | Presence of top-level `__version__`. | `__version__` attribute found. | `__version__` is missing. | N/A |
-| 5. Public API (`__all__`) | Explicit control over the public interface. | `__all__` list is present and non-empty. | `__all__` is defined but empty or invalid. | `__all__` is not defined (default namespace). |
-| 6. Encapsulation | Balance of private vs. public members. | Private member ratio is **reasonable** (< 70% or >= 5 public members). | Private ratio **> 70%** AND public members **< 5**. | Module namespace is empty. |
-| 7. API Surface Size | Whether the public API exposes too many members. | Public members $\le 150$. | Public members $\gt 150$ (Excessive size). | N/A |
-| 8. Callable Object Count | Existence of functions or classes in the public API. | At least one public function or class found. | N/A | No top-level public functions or classes found. |
-| 9. Import Health | Warnings caught during import (e.g., DeprecationWarning). | No warnings or deprecations detected. | One or more unique warnings detected. | N/A |
-| 10. Type Hint Coverage | Proportion of public callables with type hints. | **Excellent** ($\ge 75\%$ coverage). | **Moderate** ($\ge 30\%$ but $< 75\%$ coverage). | **Low** ($< 30\%$ coverage) or no callables to check. |
-| 11. Metadata Status | Package information via `importlib.metadata`. | Name and Version metadata found. | Metadata missing or incomplete. | N/A |
-| 12. License Status | License information in package metadata. | License information detected. | 'License' field missing in metadata. | Could not retrieve package metadata. |
-| 13. Dependencies | External packages required by the module. | No external package dependencies listed. | N/A | External dependencies found and listed. |
+[PASS]  Indicates the check met a quality standard or represents a desirable state.
+[WARN]  Highlights a potential issue that should be reviewed (e.g., a missing best practice).
+[INFO]  Provides neutral, contextual information about the module (e.g., dependencies found).
+[FAIL]  Indicates a critical failure, such as the module failing to import.
+[OK]    Indicates a successful import of the module.
 
----
-PERFORMANCE AND ENVIRONMENT CHECKS
----
-| Check | What It Measures | [PASS] Criteria | [INFO] Criteria | [WARN] Criteria |
-| :--- | :--- | :--- | :--- | :--- |
-| Import Performance | Time to load the module (in seconds). | **Excellent** ($< 0.1$ s). | **Acceptable** ($0.1$ s to $1.0$ s). | **Slow** ($> 1.0$ s - Potential bottleneck). |
-| Environment Check | Python version and interpreter details. | N/A | Reports Version, Threading Model, and Implementation. | Failed to retrieve details. |
+----------------------------------------
+I. GENERIC SOUNDNESS CHECKS (1-13)
+----------------------------------------
+
+1.  **File/Package Location**
+    - **Purpose:**   Identifies where the module's source code is located on the filesystem.
+    - **[PASS]:**   The file or package path was successfully found.
+    - **[INFO]:**   The module is a built-in part of Python or a C-extension with no visible path.
+
+2.  **Implementation Language Type**
+    - **Purpose:**   Determines if the module is written in Python, C, or a mix.
+    - **[PASS]:**   The language type (Pure Python, C-Extension, or Mixed) was identified.
+    - **[INFO]:**   The language type is unknown, often for built-in modules.
+
+3.  **Documentation String (__doc__)**
+    - **Purpose:**   Checks for a descriptive docstring at the top of the module.
+    - **[PASS]:**   A docstring with a reasonable length (>10 characters) was found.
+    - **[WARN]:**   The docstring is missing or too short to be descriptive.
+
+4.  **Version Information (__version__)**
+    - **Purpose:**   Checks for a `__version__` attribute, a best practice for package versioning.
+    - **[PASS]:**   The `__version__` attribute was found.
+    - **[WARN]:**   The module does not define a `__version__`.
+
+5.  **Public API Definition (__all__)**
+    - **Purpose:**   Checks for an `__all__` list, which explicitly defines the module's public API.
+    - **[PASS]:**   `__all__` is present and contains one or more members.
+    - **[WARN]:**   `__all__` is defined but is empty or not a valid list.
+    - **[INFO]:**   `__all__` is not defined, so the default public namespace is used.
+
+6.  **Object Definition Quality/Encapsulation**
+    - **Purpose:**   Assesses the balance between public and private (underscore-prefixed) members.
+    - **[PASS]:**   The ratio of private members is reasonable (<70%) or there are enough public members (>=5).
+    - **[WARN]:**   The API may be poorly encapsulated, with a high private member ratio (>70%) and very few public members (<5).
+    - **[INFO]:**   The module namespace is empty (contains no members to analyze).
+
+7.  **Public API Surface Size**
+    - **Purpose:**   Checks if the module exposes an excessively large number of public members.
+    - **[PASS]:**   The number of public members is reasonable (<= 150).
+    - **[WARN]:**   The API is excessively large (> 150 members) and may be a candidate for refactoring.
+
+8.  **Callable Object Count**
+    - **Purpose:**   Ensures the module provides usable functionality (functions or classes).
+    - **[PASS]:**   At least one public function or class was found.
+    - **[INFO]:**   No top-level public functions or classes were found.
+
+9.  **Import Health (Warnings/Deprecations)**
+    - **Purpose:**   Captures any warnings (e.g., `DeprecationWarning`) that occur during import.
+    - **[PASS]:**   The module imported cleanly with no warnings.
+    - **[WARN]:**   One or more unique warnings were detected during import.
+
+10. **Type Hint Coverage**
+    - **Purpose:**   Measures the percentage of public functions/classes that have type annotations.
+    - **[PASS]:**   Excellent coverage (>= 75%).
+    - **[WARN]:**   Moderate coverage (>= 30% but < 75%).
+    - **[INFO]:**   Low coverage (< 30%) or no callables to analyze.
+
+11. **Distribution Metadata Status**
+    - **Purpose:**   Checks if the module is part of a distributed package with metadata.
+    - **[PASS]:**   Package metadata (name and version) was found successfully.
+    - **[WARN]:**   The package was not found in the distribution database or its metadata is incomplete.
+
+12. **License Status**
+    - **Purpose:**   Checks for license information within the package metadata.
+    - **[PASS]:**   A license was detected in the package metadata.
+    - **[WARN]:**   The 'License' field is missing from the metadata.
+    - **[INFO]:**   Could not retrieve package metadata to check for a license.
+
+13. **Required Dependencies**
+    - **Purpose:**   Lists the external packages required by this module.
+    - **[PASS]:**   The module has no external dependencies listed in its metadata.
+    - **[INFO]:**   External dependencies were found and are listed in the report.
+
+----------------------------------------
+II. PERFORMANCE & ENVIRONMENT CHECKS
+----------------------------------------
+
+**Import Performance**
+- **Purpose:**   Measures the time it takes to import the module.
+- **[PASS]:**   Excellent performance (< 0.1 seconds).
+- **[INFO]:**   Acceptable performance (0.1 to 1.0 seconds).
+- **[WARN]:**   Slow performance (> 1.0 seconds), indicating a potential startup bottleneck.
+
+**Environment Check**
+- **Purpose:**   Reports key details about the Python interpreter running the check.
+- **[INFO]:**   Reports the Python version, threading model (GIL status), and implementation (CPython, PyPy, etc.).
 """
     print(doc)
     sys.exit(0)
 
-def check_module_loads(module_name: str) -> bool:
-    """
-    Attempts to import a module and performs comprehensive generic soundness checks 
-    and presents the results in a structured format.
-    """
-    print(f"Testing import of '{module_name}'...")
-    
-    start_time = time.perf_counter()
-    
-    try:
-        captured_warnings = []
-        
-        with warnings.catch_warnings(record=True) as w:
-            warnings.simplefilter("always")
-            module_object = importlib.import_module(module_name)
-            captured_warnings = list(w)
-        
-        import_duration = time.perf_counter() - start_time
+def print_report(results: List[Dict[str, Any]]):
+    # ----------------------------------------
+    # Presentation Logic
+    # ----------------------------------------
 
-        print(f"[OK] SUCCESS: Module '{module_name}' imported correctly.")
-        
-        # List to store results for the final output
-        results = []
-        check_num = 1
+    """
+    Prints the analysis results in a structured, one-line-per-test format.
 
-        # Prepare metadata for reuse
-        package_metadata = None
-        try:
-            package_metadata = importlib.metadata.metadata(module_name)
-        except Exception:
-            pass
-        
-        # Variables needed for both location and type checks
-        file_path = getattr(module_object, '__file__', 'N/A')
-        module_path = getattr(module_object, '__path__', None)
-        dirs_to_check = []
-        
-        # --- Check 1: Module File/Package Location ---
-        title = "Module File/Package Location"
-        
-        if file_path != 'N/A':
-            detail_finding = f"File Path: {file_path}"
-            status = "[PASS]"
-            if file_path.lower().endswith('__init__.py'):
-                dirs_to_check = [os.path.dirname(file_path)]
-        elif module_path:
-             detail_finding = f"Is Package (Path): {module_path}"
-             dirs_to_check = list(module_path)
-             status = "[PASS]"
+    Args:
+        results: A list of dictionaries, where each dictionary is a check result.
+    """
+    print("\n--- Generic Soundness Checks (One Line Per Test) ---")
+    
+    for r in results:
+        summary = f"({r['num']:>2}) {r['status_tag']:<6} {r['title']}: {r['detail']}"
+
+        # Special handling for checks with sub-details
+        if r['num'] == 6: # Encapsulation
+            print(summary)
+            sub_details = r.get('sub_details')
+            if sub_details and len(sub_details) == 2:
+                print(f"  - {sub_details[0].strip()} (rating: {sub_details[1].strip()}).")
+        elif r['num'] == 13: # Dependencies
+            print(summary)
+            if r.get('sub_details'):
+                for detail_line in r['sub_details']:
+                    parts = detail_line.split(':', 1)
+                    if len(parts) == 2:
+                        prefix = parts[0].strip().title().replace("Optional/Conditional", "Optional")
+                        print(f"  - {prefix}: {parts[1].strip()}")
         else:
-            detail_finding = "Built-in or C-Extension (No explicit file path found)."
+            # General case for other checks with potential sub-details
+            sub_details = r.get('sub_details')
+            if sub_details:
+                combined_subs = "; ".join([s.strip() for s in sub_details if s.strip()])
+                if combined_subs:
+                    summary += f" ({combined_subs})"
+            print(summary)
+
+def print_performance_check(analysis: 'ModuleAnalysis'):
+    """Prints the import performance check results."""
+    print("\n--- Performance Check ---")
+    EXCELLENT_PERF_THRESHOLD = 0.1
+    duration = analysis.import_duration
+    
+    if duration < EXCELLENT_PERF_THRESHOLD:
+        tag, status, output = "[PASS]", "Excellent (Fast startup)", f"{duration:.4f} s < {EXCELLENT_PERF_THRESHOLD:.1f} s."
+    elif duration < 1.0:
+        tag, status, output = "[INFO]", "Acceptable", f"{duration:.4f} seconds."
+    else:
+        tag, status, output = "[WARN]", "Slow (Potential startup bottleneck)", f"{duration:.4f} seconds."
+        
+    print(f"   {tag} Import Performance: {status} - {output}")
+
+def print_environment_check():
+    """Prints the Python environment details."""
+    print("\n--- Environment Check ---")
+    try:
+        py_version = sys.version.split()[0]
+        impl_name = sys.implementation.name.capitalize()
+        threading_model = "Varies (Non-CPython/Custom)"
+        
+        if impl_name == "Cpython":
+            is_gil_active = hasattr(sys.flags, 'gil') and getattr(sys.flags, 'gil', 0) == 1
+            threading_model = "Global Interpreter Lock (GIL) Active" if is_gil_active else "Free-Threading Active (GIL Absent)"
+        elif impl_name == "Pypy":
+            threading_model = "Software Transactional Memory (No GIL)"
+        elif impl_name == "Jython":
+            threading_model = "OS Threads (No GIL)"
+
+        print(f"   [INFO] Python Version: {py_version}")
+        print(f"   [INFO] Threading Model: {threading_model}")
+        print(f"   [INFO] Interpreter Implementation: {impl_name}")
+    except Exception:
+        print("   [WARN] Environment Info: Failed to retrieve interpreter version or details.")
+
+class ModuleAnalysis:
+    # ----------------------------------------
+    # Core Analysis Logic
+    # ----------------------------------------
+    """
+    A class to perform a comprehensive analysis of a Python module's soundness.
+    It separates the analysis logic from the presentation (printing) logic.
+    """
+    def __init__(self, module_name: str):
+        """
+        Initializes the analysis by importing the module and gathering key data.
+        This constructor acts as the main entry point for the analysis, orchestrating
+        the import and initial data gathering steps.
+        
+        Args:
+            module_name (str): The name of the module to analyze.
+
+        Raises:
+            ImportError: If the module cannot be imported.
+            Exception: For other unexpected errors during import.
+        """
+        self.module_name = module_name
+        self.module_object = None
+        self.import_duration = 0.0
+        self.captured_warnings = []
+        self.package_metadata = None
+        self.public_members = []
+        self.private_members = []
+        self.all_members = []
+        self.callables_to_analyze = []
+
+        self._import_module()
+        self._gather_members()
+        self._gather_metadata()
+
+    def _import_module(self):
+        """Imports the module, records duration, and captures warnings."""
+        start_time = time.perf_counter()
+        try:
+            with warnings.catch_warnings(record=True) as w:
+                warnings.simplefilter("always")
+                self.module_object = importlib.import_module(self.module_name)
+                self.captured_warnings = list(w)
+        finally:
+            self.import_duration = time.perf_counter() - start_time
+
+    def _gather_members(self):
+        """Gathers and categorizes all members of the module."""
+        if not self.module_object:
+            return
+
+        all_dir_members = dir(self.module_object)
+        member_names = [m for m in all_dir_members if not m.startswith('__') or m == '__all__']
+        
+        self.public_members = [m for m in member_names if not m.startswith('_')]
+        self.private_members = [m for m in member_names if m.startswith('_') and m != '__all__']
+        self.all_members = self.public_members + self.private_members
+
+        for name in self.public_members:
+            attr = getattr(self.module_object, name)
+            if inspect.isfunction(attr) or inspect.isclass(attr):
+                self.callables_to_analyze.append(attr)
+
+    def _gather_metadata(self):
+        """Retrieves package metadata if available."""
+        try:
+            self.package_metadata = importlib.metadata.metadata(self.module_name)
+        except importlib.metadata.PackageNotFoundError:
+            self.package_metadata = None
+
+    def analyze_location(self) -> Dict[str, Any]:
+        """Check 1: Determines the module's file or package location."""
+        file_path = getattr(self.module_object, '__file__', 'N/A')
+        module_path = getattr(self.module_object, '__path__', None)
+        
+        detail, status = "", ""
+        if file_path != 'N/A':
+            detail = f"File Path: {file_path}"
+            status = "[PASS]"
+        elif module_path:
+            detail = f"Is Package (Path): {module_path}"
+            status = "[PASS]"
+        else:
+            detail = "Built-in or C-Extension (No explicit file path found)."
             status = "[INFO]"
 
-        results.append({
-            "num": check_num, 
-            "title": title, 
-            "status_tag": status, 
-            "detail": detail_finding,
-            "sub_details": []
-        })
-        check_num += 1
+        return {"title": "Module File/Package Location", "status_tag": status, "detail": detail}
 
-        # --- Check 2: Implementation Language Type ---
-        title = "Implementation Language Type"
+    def analyze_language_type(self) -> Dict[str, Any]:
+        """Check 2: Determines the implementation language (Python, C-extension, etc.)."""
+        file_path = getattr(self.module_object, '__file__', 'N/A')
+        module_path = getattr(self.module_object, '__path__', None)
         module_type = "Built-in/Unknown"
         
         file_path_lower = file_path.lower()
@@ -141,69 +307,52 @@ def check_module_loads(module_name: str) -> bool:
             module_type = "Pure Python"
         elif module_path:
             module_type = "Pure Python (Namespace)"
-        
+
+        # Check for mixed-language packages
+        dirs_to_check = [os.path.dirname(file_path)] if '__init__.py' in file_path_lower else (list(module_path) if module_path else [])
         has_c_extensions_in_package = False
-        if dirs_to_check and ("Pure Python" in module_type or module_type == "Pure Python (Namespace)"):
+        if dirs_to_check and "Pure Python" in module_type:
             for d in dirs_to_check:
                 if os.path.exists(d):
                     try:
-                        for filename in os.listdir(d): 
+                        for filename in os.listdir(d):
                             if filename.lower().endswith(('.so', '.pyd', '.dll', '.dylib')):
                                 has_c_extensions_in_package = True
                                 break
-                        if has_c_extensions_in_package:
-                            break
-                    except PermissionError:
-                        pass 
+                        if has_c_extensions_in_package: break
+                    except PermissionError: pass
 
-        if has_c_extensions_in_package and "Pure Python" in module_type:
+        if has_c_extensions_in_package:
             module_type = "Mixed (Python entry, uses C-extensions)"
             
-        
-        detail = f"Identified as: {module_type}."
-        if "C-Extension" in module_type or "Pure Python" in module_type or "Mixed" in module_type:
-             status = "[PASS]"
-        else:
-             status = "[INFO]" # Built-in/Unknown
-        
-        results.append({
-            "num": check_num, 
-            "title": title, 
-            "status_tag": status, 
-            "detail": detail,
-            "sub_details": []
-        })
-        check_num += 1
+        status = "[PASS]" if "C-Extension" in module_type or "Pure Python" in module_type or "Mixed" in module_type else "[INFO]"
+        return {"title": "Implementation Language Type", "status_tag": status, "detail": f"Identified as: {module_type}."}
 
-        # 3. Check for Documentation String (__doc__)
-        title = "Documentation String (__doc__)"
-        docstring = getattr(module_object, '__doc__', None)
+    def analyze_docstring(self) -> Dict[str, Any]:
+        """Check 3: Checks for the presence and length of the module's docstring."""
+        docstring = getattr(self.module_object, '__doc__', None)
         if docstring and len(docstring.strip()) > 10:
             status = "[PASS]"
             detail = f"Found (Length: {len(docstring.strip())} characters)."
         else:
             status = "[WARN]"
             detail = "Not found or too short. Module lacks descriptive text."
-            
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-            
-        # 4. Check for Version Information (__version__)
-        title = "Version Information (__version__)"
-        version = getattr(module_object, '__version__', None)
+        return {"title": "Documentation String (__doc__)", "status_tag": status, "detail": detail}
+
+    def analyze_version(self) -> Dict[str, Any]:
+        """Check 4: Checks for the __version__ attribute."""
+        version = getattr(self.module_object, '__version__', None)
         if version:
             status = "[PASS]"
             detail = f"Found (v{version})."
         else:
             status = "[WARN]"
             detail = "Not found. Version tracking is absent (Recommended)."
-            
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-            
-        # 5. Check for Public API Definition (__all__)
-        title = "Public API Definition (__all__)"
-        all_list = getattr(module_object, '__all__', None)
+        return {"title": "Version Information (__version__)", "status_tag": status, "detail": detail}
+
+    def analyze_public_api(self) -> Dict[str, Any]:
+        """Check 5: Checks for the __all__ attribute to define a public API."""
+        all_list = getattr(self.module_object, '__all__', None)
         if all_list is not None and isinstance(all_list, list) and all_list:
             status = "[PASS]"
             detail = f"Found (Defines {len(all_list)} public objects)."
@@ -213,363 +362,203 @@ def check_module_loads(module_name: str) -> bool:
         else:
             status = "[WARN]"
             detail = "Defined but empty or not a list. Check package configuration."
-            
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-            
-        # 6. Check Object Definition Quality and Encapsulation
-        title = "Object Definition Quality/Encapsulation"
-        all_members = dir(module_object)
-        member_names = [m for m in all_members if not m.startswith('__') or m == '__all__']
-        public_members = [m for m in member_names if not m.startswith('_')]
-        private_members = [m for m in member_names if m.startswith('_') and m != '__all__']
-        total_members = len(public_members) + len(private_members)
-        
+        return {"title": "Public API Definition (__all__)", "status_tag": status, "detail": detail}
+
+    def analyze_encapsulation(self) -> Dict[str, Any]:
+        """Check 6: Analyzes the ratio of private to public members."""
+        total_members = len(self.all_members)
         sub_details = []
         if total_members > 0:
-            private_ratio = len(private_members) / total_members * 100
+            private_ratio = len(self.private_members) / total_members * 100
+            detail = f"Total Members: {total_members} (Public: {len(self.public_members)}, Private: {len(self.private_members)})"
             
-            detail = f"Total Members: {total_members} (Public: {len(public_members)}, Private: {len(private_members)})"
-            
-            # Define rating details
-            ratio_string = f"Private member ratio: {private_ratio:.1f}%"
-
-            # Define concise criteria
-            PASS_CRITERIA = "< 70% or >= 5 public members"
-            WARN_CRITERIA = "alert, >= 70% and <5 public members"
-
-            if private_ratio > 70 and len(public_members) < 5:
-                 status = "[WARN]"
-                 # Store the concise WARN criteria
-                 rating_string_full = f"{WARN_CRITERIA}"
+            if private_ratio > 70 and len(self.public_members) < 5:
+                status = "[WARN]"
+                rating_string_full = "alert, >= 70% and <5 public members"
             else:
-                 status = "[PASS]"
-                 # Store the concise PASS criteria
-                 rating_string_full = f"reasonable, {PASS_CRITERIA}"
+                status = "[PASS]"
+                rating_string_full = "reasonable, < 70% or >= 5 public members"
             
-            sub_details.append(ratio_string)
+            sub_details.append(f"Private member ratio: {private_ratio:.1f}%")
             sub_details.append(rating_string_full)
-            
         else:
             status = "[INFO]"
             detail = "Module namespace is empty (Only built-in attributes found)."
             
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail, "sub_details": sub_details})
-        check_num += 1
-                
-        # 7. Check for Excessively Large Public API Surface
-        title = "Public API Surface Size"
-        PUBLIC_API_THRESHOLD = 150 
-        if len(public_members) > PUBLIC_API_THRESHOLD:
+        return {"title": "Object Definition Quality/Encapsulation", "status_tag": status, "detail": detail, "sub_details": sub_details}
+
+    def analyze_api_surface_size(self) -> Dict[str, Any]:
+        """Check 7: Checks if the public API surface is excessively large."""
+        PUBLIC_API_THRESHOLD = 150
+        if len(self.public_members) > PUBLIC_API_THRESHOLD:
             status = "[WARN]"
-            detail = f"Excessive size detected ({len(public_members)} members). Consider segmenting."
+            detail = f"Excessive size detected ({len(self.public_members)} members). Consider segmenting."
         else:
             status = "[PASS]"
-            detail = f"Reasonable size ({len(public_members)} members)."
+            detail = f"Reasonable size ({len(self.public_members)} members)."
+        return {"title": "Public API Surface Size", "status_tag": status, "detail": detail}
 
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-
-        # 8. Check: Callable Object Count (Functions and Classes)
-        title = "Callable Object Count"
-        public_callables = 0
-        callables_to_analyze = []
-        
-        for name in public_members:
-            attr = getattr(module_object, name)
-            if inspect.isfunction(attr) or inspect.isclass(attr):
-                public_callables += 1
-                callables_to_analyze.append(attr) 
-                
-        if public_callables > 0:
+    def analyze_callable_count(self) -> Dict[str, Any]:
+        """Check 8: Counts the number of public callable objects (functions/classes)."""
+        if self.callables_to_analyze:
             status = "[PASS]"
-            detail = f"Found {public_callables} public functions/classes, indicating functionality."
+            detail = f"Found {len(self.callables_to_analyze)} public functions/classes, indicating functionality."
         else:
             status = "[INFO]"
             detail = "No top-level public functions/classes found."
+        return {"title": "Callable Object Count", "status_tag": status, "detail": detail}
 
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-
-        # 9. Check: Import Warnings
-        title = "Import Health (Warnings/Deprecations)"
+    def analyze_import_health(self) -> Dict[str, Any]:
+        """Check 9: Checks for warnings raised during module import."""
         sub_details = []
-        if captured_warnings:
-            unique_warnings = set(str(warn.message) for warn in captured_warnings)
+        if self.captured_warnings:
+            unique_warnings = set(str(warn.message) for warn in self.captured_warnings)
             status = "[WARN]"
             detail = f"{len(unique_warnings)} unique warnings detected during import."
-            
-            for warn in captured_warnings[:3]:
-                 sub_details.append(f"({type(warn.message).__name__}) {str(warn.message)[:60]}...")
+            for warn in self.captured_warnings[:3]:
+                sub_details.append(f"({type(warn.message).__name__}) {str(warn.message)[:60]}...")
         else:
             status = "[PASS]"
             detail = "No warnings or deprecations detected."
+        return {"title": "Import Health (Warnings/Deprecations)", "status_tag": status, "detail": detail, "sub_details": sub_details}
 
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail, "sub_details": sub_details})
-        check_num += 1
+    def analyze_type_hint_coverage(self) -> Dict[str, Any]:
+        """Check 10: Calculates the percentage of public callables with type hints."""
+        total_callables = len(self.callables_to_analyze)
+        if not total_callables:
+            return {"title": "Type Hint Coverage", "status_tag": "[INFO]", "detail": "No public functions or classes available for analysis."}
 
-        # 10. Check: Type Hint Coverage
-        title = "Type Hint Coverage"
         annotated_callables = 0
-        total_callables_to_check = len(callables_to_analyze)
+        for attr in self.callables_to_analyze:
+            try:
+                signature = inspect.signature(attr)
+                if signature.return_annotation is not inspect.Signature.empty:
+                    annotated_callables += 1
+                    continue
+                for param in signature.parameters.values():
+                    if param.annotation is not inspect.Parameter.empty:
+                        annotated_callables += 1
+                        break
+            except (ValueError, TypeError):
+                pass
         
-        if total_callables_to_check > 0:
-            for attr in callables_to_analyze:
-                try:
-                    signature = inspect.signature(attr)
-                    has_annotation = False
-                    if signature.return_annotation is not inspect.Signature.empty: has_annotation = True
-                    for param in signature.parameters.values():
-                        if param.annotation is not inspect.Parameter.empty:
-                            has_annotation = True
-                            break
-                    if has_annotation: annotated_callables += 1
-                except (ValueError, TypeError):
-                    pass 
-
-            coverage_percentage = (annotated_callables / total_callables_to_check) * 100
-            
-            if coverage_percentage >= 75:
-                status = "[PASS]"
-                detail = f"Excellent ({coverage_percentage:.0f}% of public callables annotated)."
-            elif coverage_percentage >= 30:
-                status = "[WARN]"
-                detail = f"Moderate ({coverage_percentage:.0f}% of public callables annotated). Aim higher."
-            else:
-                status = "[INFO]"
-                detail = f"Low ({coverage_percentage:.0f}% of public callables annotated). Recommended for public APIs."
+        coverage = (annotated_callables / total_callables) * 100
+        if coverage >= 75:
+            status, detail = "[PASS]", f"Excellent ({coverage:.0f}% of public callables annotated)."
+        elif coverage >= 30:
+            status, detail = "[WARN]", f"Moderate ({coverage:.0f}% of public callables annotated). Aim higher."
         else:
-            status = "[INFO]"
-            detail = "No public functions or classes available for analysis."
-
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
-
-        # 11. Check: Distribution Metadata Status
-        title = "Distribution Metadata Status"
-        if package_metadata:
-            name = package_metadata.get('Name')
-            version_meta = package_metadata.get('Version')
+            status, detail = "[INFO]", f"Low ({coverage:.0f}% of public callables annotated). Recommended for public APIs."
             
-            if name and version_meta:
-                status = "[PASS]"
-                detail = f"Found package '{name}' (v{version_meta}) via importlib.metadata."
+        return {"title": "Type Hint Coverage", "status_tag": status, "detail": detail}
+
+    def analyze_metadata_status(self) -> Dict[str, Any]:
+        """Check 11: Checks for package distribution metadata."""
+        if self.package_metadata:
+            name = self.package_metadata.get('Name')
+            version = self.package_metadata.get('Version')
+            if name and version:
+                status, detail = "[PASS]", f"Found package '{name}' (v{version}) via importlib.metadata."
             else:
-                status = "[WARN]"
-                detail = "Metadata found, but name/version information is incomplete."
+                status, detail = "[WARN]", "Metadata found, but name/version information is incomplete."
         else:
-             status = "[WARN]"
-             detail = "Package not found in distribution database (May be standalone/built-in)."
+            status, detail = "[WARN]", "Package not found in distribution database (May be standalone/built-in)."
+        return {"title": "Distribution Metadata Status", "status_tag": status, "detail": detail}
 
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
+    def analyze_license_status(self) -> Dict[str, Any]:
+        """Check 12: Checks for license information in package metadata."""
+        if not self.package_metadata:
+            return {"title": "License Status", "status_tag": "[INFO]", "detail": "Could not retrieve package metadata."}
 
-        # 12. Check: License Status
-        title = "License Status"
-        if package_metadata:
-            license_text = package_metadata.get('License')
+        license_text = self.package_metadata.get('License')
+        if license_text:
+            match = re.search(r'(MIT|BSD|Apache|GPL|LGPL|Public Domain)', license_text, re.IGNORECASE)
+            detail = f"{match.group(1).upper()} License detected." if match else "Custom/Complex License detected."
+            status = "[PASS]"
+        else:
+            status, detail = "[WARN]", "'License' field missing in package metadata."
             
-            if license_text:
-                match = re.search(r'(MIT|BSD|Apache|GPL|LGPL|Public Domain)', license_text, re.IGNORECASE)
-                if match:
-                    status = "[PASS]"
-                    detail = f"{match.group(1).upper()} License detected."
+        return {"title": "License Status", "status_tag": status, "detail": detail}
+
+    def analyze_dependencies(self) -> Dict[str, Any]:
+        """Check 13: Analyzes mandatory and optional dependencies from metadata."""
+        if not self.package_metadata:
+            return {"title": "Required Dependencies", "status_tag": "[INFO]", "detail": "Could not retrieve package metadata."}
+
+        requires_dist = self.package_metadata.get_all('Requires-Dist')
+        if not requires_dist:
+            return {"title": "Required Dependencies", "status_tag": "[PASS]", "detail": "No external package dependencies listed (Self-contained)."}
+
+        mandatory = set()
+        optional = set()
+        for req in requires_dist:
+            match = re.match(r'([A-Za-z0-9._-]+)', req)
+            if match:
+                dep_name = match.group(1)
+                if ';' in req:
+                    optional.add(dep_name)
                 else:
-                    status = "[PASS]"
-                    detail = "Custom/Complex License detected."
-            else:
-                status = "[WARN]"
-                detail = "'License' field missing in package metadata."
-                
-        else:
-            status = "[INFO]"
-            detail = "Could not retrieve package metadata."
+                    mandatory.add(dep_name)
+        
+        truly_optional = optional.difference(mandatory)
+        num_mandatory, num_optional = len(mandatory), len(truly_optional)
+        total_deps = num_mandatory + num_optional
 
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail})
-        check_num += 1
+        if total_deps == 0:
+            return {"title": "Required Dependencies", "status_tag": "[PASS]", "detail": "No external package dependencies listed (Self-contained)."}
 
-        # 13. Check: Required Dependencies (MANDATORY VS OPTIONAL)
-        title = "Required Dependencies"
+        detail = f"Found {total_deps} unique external packages ({num_mandatory} mandatory, {num_optional} optional/conditional)."
         sub_details = []
-        
-        if package_metadata:
-            requires_dist = package_metadata.get_all('Requires-Dist')
+        if mandatory:
+            sub_details.append(f"MANDATORY: {'; '.join(sorted(list(mandatory)))}")
+        if truly_optional:
+            sub_details.append(f"OPTIONAL/CONDITIONAL: {'; '.join(sorted(list(truly_optional)))}")
             
-            if requires_dist:
-                mandatory_dependencies = set()
-                optional_dependencies = set()
-                
-                for req in requires_dist:
-                    match = re.match(r'([A-Za-z0-9._-]+)', req)
-                    if not match:
-                        continue
-                    dep_name = match.group(1)
+        return {"title": "Required Dependencies", "status_tag": "[INFO]", "detail": detail, "sub_details": sub_details}
 
-                    if ';' in req:
-                        optional_dependencies.add(dep_name)
-                    else:
-                        mandatory_dependencies.add(dep_name)
-                
-                sorted_mandatory = sorted(list(mandatory_dependencies))
-                truly_optional_set = optional_dependencies.difference(mandatory_dependencies)
-                sorted_optional = sorted(list(truly_optional_set)) 
-                
-                num_mandatory = len(sorted_mandatory)
-                num_optional = len(sorted_optional)
-                total_deps = num_mandatory + num_optional
-                
-                if total_deps > 0:
-                    status = "[INFO]"
-                    detail = f"Found {total_deps} unique external packages ({num_mandatory} mandatory, {num_optional} optional/conditional)."
+    def run_all_checks(self) -> List[Dict[str, Any]]:
+        """
+        Runs all the analysis checks in sequence and returns the collected results.
+        This method orchestrates the execution of all individual checks.
+        
+        Returns:
+            A list of dictionaries, where each dictionary represents the result of a check.
+        """
+        results = [
+            self.analyze_location(),
+            self.analyze_language_type(),
+            self.analyze_docstring(),
+            self.analyze_version(),
+            self.analyze_public_api(),
+            self.analyze_encapsulation(),
+            self.analyze_api_surface_size(),
+            self.analyze_callable_count(),
+            self.analyze_import_health(),
+            self.analyze_type_hint_coverage(),
+            self.analyze_metadata_status(),
+            self.analyze_license_status(),
+            self.analyze_dependencies(),
+        ]
+        # Add a number to each result for presentation purposes
+        for i, result in enumerate(results):
+            result['num'] = i + 1
 
-                    if num_mandatory > 0:
-                        sub_details.append(f"MANDATORY: {'; '.join(sorted_mandatory)}")
-                    if num_optional > 0:
-                        sub_details.append(f"OPTIONAL/CONDITIONAL: {'; '.join(sorted_optional)}")
-                else:
-                    status = "[PASS]"
-                    detail = "No external package dependencies listed (Self-contained)."
-            else:
-                status = "[PASS]"
-                detail = "No external package dependencies listed (Self-contained)."
-        else:
-            status = "[INFO]"
-            detail = "Could not retrieve package metadata."
-            
-        results.append({"num": check_num, "title": title, "status_tag": status, "detail": detail, "sub_details": sub_details})
-        check_num += 1
-        
-        # --- Output: Compact Single-Line Display ---
-        print("\n--- Generic Soundness Checks (One Line Per Test) ---")
-        
-        for r in results:
-            summary = f"({r['num']:>2}) {r['status_tag']:<6} {r['title']}: {r['detail']}"
-            
-            if r['num'] == 6:
-                # Print the main summary line first
-                print(summary)
-                
-                sub_details = r.get('sub_details')
-                if sub_details and len(sub_details) == 2:
-                    ratio_part = sub_details[0].strip()
-                    # rating_part now contains the full, concise rating and criteria:
-                    # e.g., "reasonable, < 70% or >= 5 public members"
-                    # or "alert, >= 70% and <5 public members"
-                    rating_part = sub_details[1].strip() 
-                    
-                    # Use the combined rating string directly
-                    output_line = f"  - {ratio_part} (rating: {rating_part})."
-                        
-                    print(output_line)
-                elif sub_details:
-                    # Fallback for unexpected number of sub_details
-                    combined_subs = "; ".join([s.strip() for s in sub_details if s.strip()])
-                    print(f"  - {combined_subs}")
-            
-            elif r['num'] == 13:
-                
-                print(summary)
-                
-                if r.get('sub_details'):
-                    
-                    for detail_line in r['sub_details']:
-                        parts = detail_line.split(':', 1)
-                        if len(parts) == 2:
-                            prefix = parts[0].strip().title().replace("Optional/Conditional", "Optional")
-                            content = parts[1].strip()
-                            print(f"  - {prefix}: {content}")
-                
-            else:
-                if r.get('sub_details'):
-                    combined_subs = "; ".join([s.strip() for s in r['sub_details'] if s.strip()])
-                    if combined_subs:
-                        summary += f" ({combined_subs})"
-                
-                print(summary)
-
-        
-        # --- Performance Check (Separate output) ---
-        print("\n--- Performance Check ---")
-        EXCELLENT_PERF_THRESHOLD = 0.1 # Threshold for "Excellent (Fast startup)" in seconds
-        
-        if import_duration < EXCELLENT_PERF_THRESHOLD:
-            perf_status_tag = "[PASS]"
-            perf_status = "Excellent (Fast startup)"
-            # Applied fix: replaced ", " with " - " and removed trailing ")" for a period "."
-            perf_output = f"{perf_status} - {import_duration:.4f} s < {EXCELLENT_PERF_THRESHOLD:.1f} s."
-        elif import_duration < 1.0:
-            perf_status_tag = "[INFO]"
-            perf_status = "Acceptable"
-            # Applied fix: replaced " ({...})." with " - {...}."
-            perf_output = f"{perf_status} - {import_duration:.4f} seconds."
-        else:
-            perf_status_tag = "[WARN]"
-            perf_status = "Slow (Potential startup bottleneck)"
-            # Applied fix: replaced " ({...})." with " - {...}."
-            perf_output = f"{perf_status} - {import_duration:.4f} seconds."
-            
-        # The final print statement for the performance check
-        print(f"   {perf_status_tag} Import Performance: {perf_output}")
-
-
-        # --- Environment Check (Separate output) ---
-        print("\n--- Environment Check ---")
-        try:
-            py_version = sys.version.split()[0]
-            print(f"   [INFO] Python Version: {py_version}")
-            
-            # --- Dedicated GIL/Free-Threaded Check (Simplified Logic) ---
-            impl_name = sys.implementation.name.capitalize()
-            threading_model = "Varies (Non-CPython/Custom)"
-            
-            if impl_name == "Cpython":
-                
-                # Check based on user's definitive finding: presence of sys.flags.gil == 1 means GIL
-                is_gil_active = hasattr(sys.flags, 'gil') and getattr(sys.flags, 'gil', 0) == 1
-                
-                if is_gil_active:
-                    threading_model = "Global Interpreter Lock (GIL) Active"
-                else:
-                    threading_model = "Free-Threading Active (GIL Absent)"
-            
-            elif impl_name == "Pypy":
-                threading_model = "Software Transactional Memory (No GIL)"
-            elif impl_name == "Jython":
-                threading_model = "OS Threads (No GIL)"
-                
-            print(f"   [INFO] Threading Model: {threading_model}")
-            print(f"   [INFO] Interpreter Implementation: {impl_name}")
-            
-        except Exception:
-             print("   [WARN] Environment Info: Failed to retrieve interpreter version or details.")
-        
-        return True
-        
-    except ImportError as e:
-        print("\n--- Import Failure ---")
-        print(f"[FAIL] FAILURE: Module '{module_name}' could could not be imported.")
-        print(f"   Error: {e}")
-        print(f"   Suggestion: Ensure the package is installed (e.g., 'pip install {module_name}')")
-        return False
-        
-    except Exception as e:
-        print("\n--- Unexpected Failure ---")
-        print(f"[FAIL] FAILURE: An unexpected error occurred while loading '{module_name}'.")
-        print(f"   Error Type: {type(e).__name__}")
-        print(f"   Details: {e}")
-        return False
+        return results
 
 if __name__ == "__main__":
+    # ----------------------------------------
+    # Main Execution Block
+    # ----------------------------------------
     
     parser = argparse.ArgumentParser(
         description="Check if a specified Python module can be imported successfully and assess its generic soundness.",
-        epilog="Example usage: python check_module_load_status.py requests"
+        epilog="Example usage: python python_module_tester.py requests"
     )
     
     parser.add_argument(
         "module_name",
         type=str,
-        nargs='?', # Makes the module name optional
+        nargs='?',
         help="The name of the module to test (e.g., 'requests', 'numpy')."
     )
     
@@ -581,17 +570,38 @@ if __name__ == "__main__":
     
     args = parser.parse_args()
 
-    # Check for methodology flag first
     if args.checks_methodology:
         print_methodology_doc()
-        # Note: print_methodology_doc calls sys.exit(0)
 
-    # Only run the test logic if a module name was actually provided.
-    if args.module_name:
-        print("=" * 40)
-        print("PYTHON MODULE LOADING TEST UTILITY")
-        print("=" * 40)
+    if not args.module_name:
+        if not args.checks_methodology:
+            parser.print_help()
+        sys.exit(0)
+
+    print("=" * 40)
+    print("PYTHON MODULE LOADING TEST UTILITY")
+    print("=" * 40)
+
+    try:
+        print(f"Testing import of '{args.module_name}'...")
+        analysis = ModuleAnalysis(args.module_name)
+        print(f"[OK] SUCCESS: Module '{args.module_name}' imported correctly.")
         
-        check_module_loads(args.module_name)
+        results = analysis.run_all_checks()
         
+        print_report(results)
+        print_performance_check(analysis)
+        print_environment_check()
+
+    except ImportError as e:
+        print("\n--- Import Failure ---")
+        print(f"[FAIL] FAILURE: Module '{args.module_name}' could not be imported.")
+        print(f"   Error: {e}")
+        print(f"   Suggestion: Ensure the package is installed (e.g., 'pip install {args.module_name}')")
+    except Exception as e:
+        print("\n--- Unexpected Failure ---")
+        print(f"[FAIL] FAILURE: An unexpected error occurred while loading '{args.module_name}'.")
+        print(f"   Error Type: {type(e).__name__}")
+        print(f"   Details: {e}")
+    finally:
         print("=" * 40)
