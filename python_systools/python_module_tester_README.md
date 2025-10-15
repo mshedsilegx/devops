@@ -35,6 +35,7 @@ The script accepts the following command-line arguments:
 | ---------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `module_name`          | string | **(Required)** The name of the Python module to be tested (e.g., `requests`, `numpy`, `pandas`). The script will attempt to import this module. |
 | `--checks-methodology` | flag   | **(Optional)** If provided, the script will display a detailed explanation of all checks and their rating criteria, and then exit.       |
+| `--help` | flag   | **(Optional)** This will print the help text and exit without performing any analysis. |
 
 ## 4. Examples
 
@@ -102,4 +103,3 @@ These checks measure the module's import time and report details about the execu
 | :------------------- | :------------------------------------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Import Performance** | Measures the time it takes to import the module.                           | **`[PASS]`**: Excellent performance (< 0.1 seconds).<br>**`[INFO]`**: Acceptable performance (0.1 to 1.0 seconds).<br>**`[WARN]`**: Slow performance (> 1.0 seconds), indicating a potential bottleneck. |
 | **Environment Check**  | Reports key details about the Python interpreter running the check.        | **`[INFO]`**: Reports the Python version, threading model (GIL status), and implementation (e.g., CPython).                                                                                            |
-This will print the help text and exit without performing any analysis.
