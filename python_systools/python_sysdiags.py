@@ -252,7 +252,7 @@ def print_text_report(results):
         data = results['tls13']
         print(f"\n----- TLS 1.3 Capability Check -----")
         if data['status'] == 'OK':
-            print(f"TLSVersion.TLSv1_3 constant: 772") # This is a static value in the original, replicating it
+            print(f"TLSVersion.TLSv1_3 constant: {ssl.TLSVersion.TLSv1_3}")
             print("SSLContext successfully created with minimum TLS 1.3 version.")
             print("This confirms active TLS 1.3 support through OpenSSL.")
         else:
