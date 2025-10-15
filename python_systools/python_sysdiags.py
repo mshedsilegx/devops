@@ -1,7 +1,7 @@
 #!/var/opt/python314/bin/python3.14
 # ------------------------------------------
 # /var/opt/apps/system/python_sysdiags.py
-# v2.0.0xg  2025/10/15  Jules / AI Engineer
+# v1.3.5xg  2025/10/15  XdG / MIS Center
 # ------------------------------------------
 """
 A comprehensive Python script to verify the Python interpreter's build environment,
