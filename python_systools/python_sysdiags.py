@@ -8,6 +8,9 @@ A comprehensive Python script to verify the Python interpreter's build environme
 specifically its linkage and capabilities with OpenSSL, and other key system settings.
 
 Outputs detailed information in human-readable text or structured JSON format.
+Presents detailed information about Python version, paths, environment flags,
+OpenSSL version, TLS protocol support (including TLS 1.3),
+basic hashlib functionality, and standard library module availability.
 
 Usage:
   python_sysdiags.py [options]
@@ -25,6 +28,12 @@ Options:
   --rlimits      Display System Resource Limits (Unix-like only).
   --all          Display all sections (default if no options specified).
   -h, --help     Show this help message and exit.
+If no options are specified, the script will display all sections.
+
+Required: Ensure that the following environment variables are UNSET
+          in the shell *before* executing this script:
+          PYTHONPATH, PYTHONHOME, PYTHON, PYTHON_PLATFORM
+          (e.g., `unset PYTHONPATH`)
 """
 
 import ssl
@@ -32,9 +41,9 @@ import sys
 import hashlib
 import sysconfig
 import os
-import importlib.util
-import argparse
-import math
+import importlib.util  # For checking module presence
+import argparse  # For command-line argument parsing
+import math  # Added for the math module check
 import json
 
 try:
