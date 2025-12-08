@@ -31,8 +31,7 @@ The script requires a single command-line argument:
 
 | Argument                  | Description                                       | Type   | Default |
 | ------------------------- | ------------------------------------------------- | ------ | ------- |
-| `<directory_to_scan>`     | The path to the directory you wish to scan for    | string | N/A     |
-|                           | Python files. This argument is **required**.      |        |         |
+| `<directory_to_scan>`     | The path to the directory to scan for Python files (argument **required**)  | string | N/A     |
 
 ## 4. Examples on How to Use
 
