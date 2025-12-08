@@ -4,6 +4,17 @@
 # v1.0.1xg  2025/10/10  XdG / MIS Center
 # ----------------------------------------------
 # Requirements: Python 3.10 or newer.
+#
+# OVERVIEW:
+# This script analyzes a given directory of Python source code to identify and report
+# all external (third-party) dependencies. It recursively scans for .py files,
+# parses them using Abstract Syntax Trees (AST) to find import statements, and
+# distinguishes external modules from Python's standard library modules.
+# The script then attempts to determine the version of each external module.
+#
+# The final output provides two summaries:
+# 1. A unique list of all external modules and their versions.
+# 2. A file-by-file breakdown of external dependencies.
 
 import os
 import sys
@@ -34,6 +45,7 @@ def get_module_version(module_name):
     Returns "N/A" if the version cannot be determined.
     """
     # Attempt 1: Use importlib.metadata (preferred as it doesn't import the module)
+    # This is the safest and most reliable method as it reads package metadata directly.
     try:
         return version(module_name)
     except PackageNotFoundError:
@@ -81,6 +93,7 @@ def extract_imports(file_path, stdlib_modules):
     with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
         try:
             # Parse the file into an Abstract Syntax Tree (AST)
+            # This is a safe way to analyze code without executing it.
             tree = ast.parse(f.read(), filename=file_path)
             for node in ast.walk(tree):
                 # Handle 'import module_name' or 'import package.submodule'
@@ -91,7 +104,7 @@ def extract_imports(file_path, stdlib_modules):
                             imports.add(top_level_module)
                 # Handle 'from module_name import something' or 'from package.subpackage import something'
                 elif isinstance(node, ast.ImportFrom):
-                    # node.level == 0 indicates an absolute import (not relative)
+                    # node.level == 0 indicates an absolute import (not a relative one like 'from . import ...')
                     if node.level == 0:
                         if node.module: # Ensure module name exists (e.g., 'from . import x' might have node.module is None)
                             top_level_module = node.module.split('.')[0]
@@ -111,6 +124,10 @@ def extract_imports(file_path, stdlib_modules):
 
 # --- Main execution function ---
 def main():
+    """
+    Main function to execute the script. It handles command-line arguments,
+    orchestrates the file scanning and parsing, and prints the final reports.
+    """
     # --- Strict Runtime Version Check ---
     # Ensure the script is run with Python 3.10 or newer.
     if sys.version_info < (3, 10):
@@ -133,8 +150,9 @@ def main():
         print(f"Error: '{root_directory}' is not a valid directory or does not exist.", file=sys.stderr)
         sys.exit(1)
 
-    all_external_modules = set()
-    file_external_dependencies = defaultdict(set)
+    # Data structures to hold the results
+    all_external_modules = set() # A set of all unique external modules found
+    file_external_dependencies = defaultdict(set) # A dictionary mapping files to their external modules
 
     # Find all Python files recursively
     python_files = find_python_files(root_directory)
