@@ -98,6 +98,25 @@ def get_package_type(dist):
 
     return "unknown"
 
+def get_package_type(dist):
+    """Determine the packaging type of a distribution (e.g., wheel, sdist)."""
+    # A simple way to check is to look at the path of one of its metadata files.
+    # Wheel installations use .dist-info directories, legacy sdists use .egg-info.
+    try:
+        # dist.files contains paths relative to the site-packages directory.
+        # One of these files is the METADATA file.
+        for file_path in dist.files:
+            if str(file_path).endswith('.dist-info/METADATA'):
+                return "wheel"
+            elif str(file_path).endswith('.egg-info/PKG-INFO'):  # sdists have PKG-INFO
+                return "sdist (egg)"
+            # Some old packages might just have an .egg-info file.
+            elif str(file_path).endswith('.egg-info'):
+                return "sdist (egg)"
+    except Exception:
+        pass  # If we can't determine it, we'll return "unknown"
+    return "unknown"
+
 def list_modules():
     """Lists all installed Python modules and their locations, avoiding duplicates."""
     # Define column headers. Location is shrunk, and Type is slightly expanded.
@@ -189,6 +208,9 @@ def main():
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument("--list", action="store_true", help="List all installed modules.")
     group.add_argument("--upgrade", action="store_true", help="Upgrade all installed modules.")
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument("--list", action="store_true", help="List all installed modules.")
+    group.add_argument("--upgrade", action="store_true", help="Upgrade all installed modules.")
     parser.add_argument("--simulate", action="store_true", help="Simulate the upgrade process.")
     parser.add_argument("--target", type=str, help="Specify a target directory for module upgrades.")
 
@@ -199,6 +221,8 @@ def main():
     elif args.upgrade:
         upgrade_modules(simulate=args.simulate, target=args.target)
     else:
+        # This branch is technically unreachable because the group is required,
+        # but we keep it for clarity and robustness.
         # This branch is technically unreachable because the group is required,
         # but we keep it for clarity and robustness.
         parser.print_help()
