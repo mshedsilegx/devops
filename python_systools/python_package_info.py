@@ -3,6 +3,24 @@
 # python_module_info.py
 # v1.0.0xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
+#
+# Objective:
+# This script provides a reliable and detailed inspection of an installed Python package.
+# It is designed to find the exact on-disk installation location of a package and
+# retrieve comprehensive metadata, including version, dependencies, and module type.
+#
+# Core Functionality:
+# 1. Path Resolution: Implements a robust, multi-step process to determine the
+#    exact path of the package, prioritizing Python's own import machinery to
+#    ensure accuracy, especially for complex packages (e.g., namespace, editable).
+# 2. Metadata Retrieval: Uses the standard `importlib.metadata` library to fetch
+#    details like version, author, license, and dependencies.
+# 3. External Version Check: Optionally queries the PyPI API to find the latest
+#    available version of the package, helping identify outdated dependencies.
+# 4. Output Flexibility: Provides both human-readable text output (with multiple
+#    verbosity levels) and a machine-parseable JSON format for automation.
+#
+# ----------------------------------------------
 
 import argparse
 import importlib.metadata
@@ -49,7 +67,19 @@ DEBUG_MODE = False
 def get_latest_version_from_pypi(package_name: str) -> str:
     """
     Fetches the latest published version of a package from the PyPI JSON API.
+
+    This function performs a network request to the public PyPI repository to get
+    the latest version number. It is designed to be resilient—if the 'requests'
+    library is not installed or if there is a network error, it will return a
+    descriptive error string instead of crashing the script.
+
+    Args:
+        package_name: The name of the package as it is known on PyPI.
+
+    Returns:
+        A string containing the latest version number, or an error message.
     """
+    # Check if the real 'requests' library is available. If not, use the dummy and return an error.
     if 'requests' not in sys.modules and requests.__name__ == 'DummyRequests':
         return "Error: requests library not found for network lookup"
 
@@ -74,9 +104,21 @@ def get_latest_version_from_pypi(package_name: str) -> str:
 def get_module_type(dist: importlib.metadata.Distribution) -> str:
     """
     Determines if a package is purelib or platlib by checking for compiled files.
+
+    A 'purelib' package contains only Python code and can run on any OS.
+    A 'platlib' package contains platform-specific compiled code (e.g., C extensions)
+    and is specific to an OS and architecture.
+
+    Args:
+        dist: An `importlib.metadata.Distribution` object for the package.
+
+    Returns:
+        A string indicating "purelib" or "platlib".
     """
+    # Define a set of file extensions that indicate compiled, platform-specific binaries.
     compiled_extensions = ('.so', '.pyd', '.dll', '.dylib')
     
+    # If the package metadata does not include a file list, we cannot determine the type.
     if dist.files is None:
         return "Type Unknown (No File Listing)"
         
@@ -90,6 +132,18 @@ def get_module_type(dist: importlib.metadata.Distribution) -> str:
 def resolve_package_metadata(package_name: str) -> dict:
     """
     Resolves all package properties, including path and versions, using definitive file-based logic.
+
+    This is the core function of the script. It orchestrates the process of finding
+    a package, determining its importable name, resolving its exact file path, and
+    gathering all relevant metadata. The path resolution is particularly robust,
+    employing a multi-step strategy to ensure accuracy.
+
+    Args:
+        package_name: The name of the package to resolve.
+
+    Returns:
+        A dictionary containing all the resolved metadata. In case of an error,
+        it returns a dictionary with an "error" key.
     """
     global DEBUG_MODE
     
@@ -100,6 +154,8 @@ def resolve_package_metadata(package_name: str) -> dict:
         return {"error": f"Python {MIN_PYTHON_VERSION_TUPLE[0]}.{MIN_PYTHON_VERSION_TUPLE[1]} or newer required for metadata handling."}
         
     # --- 1. Get Distribution Metadata ---
+    # Use the standard `importlib.metadata` to find the package. This is the
+    # modern and reliable way to query installed package information.
     try:
         dist = importlib.metadata.distribution(package_name)
         current_version = dist.version
@@ -109,15 +165,21 @@ def resolve_package_metadata(package_name: str) -> dict:
         return {"error": f"Package '{package_name}' not found."}
 
     # --- 2. Determine Top-Level Module (TML) ---
+    # The "top-level module" is the name you actually use in an `import` statement.
+    # It can be different from the package name (e.g., package `Pillow` -> import `PIL`).
+    # The `top_level.txt` file within the package's `.dist-info` is the definitive source for this.
     top_level_text = dist.read_text('top_level.txt')
     
     if top_level_text:
         # Use the first line as the primary TML.
         raw_tml = top_level_text.splitlines()[0].strip()
     else:
+        # If `top_level.txt` is missing, fall back to a normalized version of the package name.
         raw_tml = package_name.lower().replace('-', '_')
 
     # FIX 1: TML Correction. Ensure TML is the import name, not an internal component.
+    # This section handles edge cases where the TML from `top_level.txt` might be
+    # ambiguous or incorrect. It applies heuristics to select the correct import name.
     package_name_normalized = package_name.lower().replace('-', '_')
     top_level_module = raw_tml
     
@@ -137,12 +199,17 @@ def resolve_package_metadata(package_name: str) -> dict:
 
 
     # --- 3. Determine Installation Root (dist_root) ---
+    # This step calculates the base `site-packages` or `dist-packages` directory where
+    # the package is installed. We do this by finding the `.dist-info` directory and
+    # getting its parent. This is more reliable than using `dist.location`, which can be inconsistent.
     dist_root = "Could not determine root."
     
     # Calculate root without relying on the unreliable 'dist.location' attribute
     try:
         if dist.files:
+            # Find the name of the .dist-info or .egg-info directory from the file list.
             dist_info_folder_name = [str(f).split(os.sep)[0] for f in dist.files if str(f).endswith('.dist-info') or str(f).endswith('.egg-info')][0]
+            # Locate that folder and get its parent, which is the installation root.
             dist_root = str(Path(os.path.abspath(dist.locate_file(Path(dist_info_folder_name)))).parent)
 
     except Exception:
@@ -153,9 +220,13 @@ def resolve_package_metadata(package_name: str) -> dict:
         print(f"DEBUG 1: Distribution Root (Calculated): {dist_root}")
 
     # --- 4. Locate the installation folder (FINAL PATH LOGIC) ---
+    # This is the most critical part of the script. It uses a multi-step strategy
+    # to find the exact path of the package's code.
     resolved_path = "Could not resolve path."
     
-    # Primary Method: Construct Path using the calculated root + TML
+    # Primary Method: Construct Path using the calculated root + TML.
+    # This works for most standard packages. We guess the path by combining the
+    # installation root (e.g., `.../site-packages/`) with the module name (e.g., `requests`).
     if dist_root != "Could not determine root." and Path(dist_root).is_dir():
         potential_path = Path(dist_root) / top_level_module
         
@@ -171,15 +242,19 @@ def resolve_package_metadata(package_name: str) -> dict:
         else:
              resolved_path = "Falling through to find_spec."
 
-    # Fallback Method: Use find_spec() only if primary method failed or explicitly fell through.
+    # Fallback Method: Use find_spec() only if the primary method failed.
+    # `importlib.util.find_spec()` asks Python's import system directly to locate
+    # the module. This is the ultimate source of truth and correctly handles
+    # complex cases like namespace packages, editable installs, and single-file modules.
     if resolved_path == "Could not resolve path." or resolved_path == "Falling through to find_spec.":
         try:
             spec = importlib.util.find_spec(top_level_module)
             
             if spec and spec.submodule_search_locations:
-                # This is the most accurate result from the import system (e.g., /.../cffi)
+                # For regular packages, this attribute gives the directory path.
                 resolved_path = spec.submodule_search_locations[0]
             elif spec and spec.origin:
+                # For single-file modules, we get the file path and then find its directory.
                 resolved_path = os.path.dirname(spec.origin)
             else:
                  # Final resort: use the calculated install root
@@ -193,11 +268,15 @@ def resolve_package_metadata(package_name: str) -> dict:
         print("--- DEBUG: Path Resolution End ---\n")
 
     # --- 5. Gather Remaining Metadata ---
+    # With the core path resolution complete, we now collect all other useful
+    # information about the package.
     latest_version = get_latest_version_from_pypi(package_name)
     module_type = get_module_type(dist)
     
+    # Get the list of dependencies.
     requires_dist = metadata_dict.get('Requires-Dist')
     
+    # Assemble the final dictionary to be returned.
     return {
         "package_name": package_name,
         "import_name": top_level_module, 
@@ -220,15 +299,27 @@ def resolve_package_metadata(package_name: str) -> dict:
 def display_results(metadata: dict, json_output: bool, quiet_mode: bool, verbose_mode: bool):
     """
     Prints the structured metadata dictionary either as formatted text or JSON.
+
+    This function is responsible for the presentation layer. It takes the data
+    dictionary from `resolve_package_metadata` and formats it for the user based
+    on the specified command-line flags.
+
+    Args:
+        metadata: The dictionary of package information.
+        json_output: If True, output in JSON format.
+        quiet_mode: If True, suppress headers in text output.
+        verbose_mode: If True, include extra details in text output.
     """
+    # If the metadata dictionary contains an error, print it to stderr and exit.
     if 'error' in metadata:
         sys.stderr.write(f"ERROR: {metadata['error']}\n")
         return
         
+    # Handle JSON output.
     if json_output:
         print(json.dumps(metadata, indent=4))
     else:
-        # Human-readable text output
+        # Handle human-readable text output.
         
         if not quiet_mode:
             print("\n--- Package Metadata ---")
@@ -261,12 +352,22 @@ def display_results(metadata: dict, json_output: bool, quiet_mode: bool, verbose
 
 
 def main():
+    """
+    The main entry point of the script.
+
+    This function is responsible for:
+    1. Parsing command-line arguments.
+    2. Calling the core logic to resolve package metadata.
+    3. Passing the results to the display function for output.
+    """
     global DEBUG_MODE
     
+    # Set up the command-line argument parser.
     parser = argparse.ArgumentParser(
         description="Locate the exact installation folder and retrieve metadata for a Python package."
     )
     
+    # Define all the command-line arguments the script accepts.
     parser.add_argument(
         '--package',
         type=str,
