@@ -2,6 +2,8 @@
 
 ## Application Overview and Objectives
 
+The nomodeset parameter is recommended for headless servers as it instructs the kernel to disable the complex graphics drivers (DRM/TTM). This avoids kernel-level bugs, like TTM buffer eviction failures, which cause system deadlocks. By using the basic text console instead of hardware-accelerated graphics, nomodeset significantly boosts stability, reliability, and security for all non-graphical servers.
+
 The `set_nomodeset.sh` script is a bash utility designed to automate the configuration of Linux kernel boot parameters, specifically for headless servers or systems encountering graphics driver compatibility issues. 
 
 **Core Objectives:**
