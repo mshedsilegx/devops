@@ -69,7 +69,7 @@ def get_latest_version_from_pypi(package_name: str) -> str:
     Fetches the latest published version of a package from the PyPI JSON API.
 
     This function performs a network request to the public PyPI repository to get
-    the latest version number. It is designed to be resilientâ€”if the 'requests'
+    the latest version number. It is designed to be resilient—if the 'requests'
     library is not installed or if there is a network error, it will return a
     descriptive error string instead of crashing the script.
 
@@ -184,18 +184,23 @@ def resolve_package_metadata(package_name: str) -> dict:
     top_level_module = raw_tml
     
     # Specific fix for known complex packages where TML is not the package name
-    if top_level_module == 'snowflake' and package_name_normalized == 'snowflake_connector_python':
-         top_level_module = 'snowflake'
-    elif top_level_module == '_cffi_backend' and package_name_normalized == 'cffi':
-         top_level_module = 'cffi'
-    # General fallback: if the derived TML looks like a sub-module, but the package name is the real import name.
-    elif top_level_module not in package_name_normalized and top_level_module.startswith('_'):
+    if not top_level_module:
+        # If the TML is empty (e.g., pyodbc), default to package name
+        # Specific fix for known complex packages where TML is not the package name
         top_level_module = package_name_normalized
-    elif package_name_normalized.startswith(top_level_module):
-         pass # Assume TML is correct (e.g., 'urllib3')
+    # General fallback: if the derived TML looks like a sub-module, but the package name is the real import name.
+    elif top_level_module.startswith('_') and top_level_module != package_name_normalized:
+        # If TML is an internal module (like _cffi_backend), default to package name
+        top_level_module = package_name_normalized
+    elif package_name_normalized.startswith(top_level_module) and len(package_name_normalized) > len(top_level_module):
+         # Handle cases like snowflake-connector-python (TML: snowflake)
+         # In this case, the raw_tml is often correct and should be kept.
+         pass
     else:
-        # Final fallback for namespace packages, often just the first word
-        top_level_module = package_name_normalized.split('_')[0]
+        # For simplicity, if the TML is still not resolved, use the normalized package name
+        # This covers cases like pyodbc or other complex single-file modules
+        if not top_level_module or not importlib.util.find_spec(top_level_module):
+             top_level_module = package_name_normalized
 
 
     # --- 3. Determine Installation Root (dist_root) ---
@@ -209,6 +214,7 @@ def resolve_package_metadata(package_name: str) -> dict:
         if dist.files:
             # Find the name of the .dist-info or .egg-info directory from the file list.
             dist_info_folder_name = [str(f).split(os.sep)[0] for f in dist.files if str(f).endswith('.dist-info') or str(f).endswith('.egg-info')][0]
+
             # Locate that folder and get its parent, which is the installation root.
             dist_root = str(Path(os.path.abspath(dist.locate_file(Path(dist_info_folder_name)))).parent)
 
@@ -224,7 +230,7 @@ def resolve_package_metadata(package_name: str) -> dict:
     # to find the exact path of the package's code.
     resolved_path = "Could not resolve path."
     
-    # Primary Method: Construct Path using the calculated root + TML.
+    # Primary Method: Construct Path using the calculated root + TML
     # This works for most standard packages. We guess the path by combining the
     # installation root (e.g., `.../site-packages/`) with the module name (e.g., `requests`).
     if dist_root != "Could not determine root." and Path(dist_root).is_dir():
@@ -262,6 +268,19 @@ def resolve_package_metadata(package_name: str) -> dict:
         except ImportError:
             # If import fails, fall back to calculated root
             resolved_path = dist_root 
+
+    # FIX 2: Final Check for Single-File Modules (like pyodbc)
+    if resolved_path == "Could not determine root via files.":
+        # We try to locate the TML's entry point file to get a reliable absolute root path.
+        try:
+            # The TML (e.g., 'pyodbc') should be a file/directory in the installation root.
+            # Locate the file and get its parent directory path.
+            potential_root_path = str(Path(os.path.abspath(dist.locate_file(Path(top_level_module)))).parent)
+            
+            if Path(potential_root_path).is_dir():
+                resolved_path = potential_root_path
+        except Exception:
+             pass 
 
     if DEBUG_MODE:
         print(f"DEBUG FINAL: Resolved Path Before Return: {resolved_path}")
