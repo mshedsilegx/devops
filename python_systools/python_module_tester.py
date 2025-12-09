@@ -1,7 +1,7 @@
-#!/var/opt/python314/bin/python3.14
+#!/usr/bin/env python3
 # ----------------------------------------------
-# /var/opt/apps/system/python_module_tester.py
-# v1.0.0xg  2025/10/14  XdG / MIS Center
+# python_module_tester.py
+# v1.0.1xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 
 # -*- coding: utf-8 -*-

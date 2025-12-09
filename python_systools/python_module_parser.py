@@ -1,7 +1,7 @@
-#!/var/opt/python314/bin/python3.14
+#!/usr/bin/env python3
 # ----------------------------------------------
-# /var/opt/apps/system/python_module_parser.py
-# v1.0.1xg  2025/10/10  XdG / MIS Center
+# python_module_parser.py
+# v1.0.2xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 # Requirements: Python 3.10 or newer.
 #
