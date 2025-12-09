@@ -1,26 +1,26 @@
 #!/usr/bin/env python3
 # ----------------------------------------------
-# python_module_info.py
+# python_package_info.py
 # v1.0.0xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 #
-# Objective:
-# This script provides a reliable and detailed inspection of an installed Python package.
-# It is designed to find the exact on-disk installation location of a package and
-# retrieve comprehensive metadata, including version, dependencies, and module type.
-#
-# Core Functionality:
-# 1. Path Resolution: Implements a robust, multi-step process to determine the
-#    exact path of the package, prioritizing Python's own import machinery to
-#    ensure accuracy, especially for complex packages (e.g., namespace, editable).
-# 2. Metadata Retrieval: Uses the standard `importlib.metadata` library to fetch
-#    details like version, author, license, and dependencies.
-# 3. External Version Check: Optionally queries the PyPI API to find the latest
-#    available version of the package, helping identify outdated dependencies.
-# 4. Output Flexibility: Provides both human-readable text output (with multiple
-#    verbosity levels) and a machine-parseable JSON format for automation.
-#
-# ----------------------------------------------
+"""
+Objective:
+    This script provides a reliable and detailed inspection of an installed Python package.
+    It is designed to find the exact on-disk installation location of a package and
+    retrieve comprehensive metadata, including version, dependencies, and module type.
+
+Core Functionality:
+    1. Path Resolution: Implements a robust, multi-step process to determine the
+       exact path of the package, prioritizing Python's own import machinery to
+       ensure accuracy, especially for complex packages (e.g., namespace, editable).
+    2. Metadata Retrieval: Uses the standard `importlib.metadata` library to fetch
+       details like version, author, license, and dependencies.
+    3. External Version Check: Optionally queries the PyPI API to find the latest
+       available version of the package, helping identify outdated dependencies.
+    4. Output Flexibility: Provides both human-readable text output (with multiple
+       verbosity levels) and a machine-parseable JSON format for automation.
+"""
 
 import argparse
 import importlib.metadata
@@ -69,7 +69,7 @@ def get_latest_version_from_pypi(package_name: str) -> str:
     Fetches the latest published version of a package from the PyPI JSON API.
 
     This function performs a network request to the public PyPI repository to get
-    the latest version number. It is designed to be resilient—if the 'requests'
+    the latest version number. It is designed to be resilientâ€”if the 'requests'
     library is not installed or if there is a network error, it will return a
     descriptive error string instead of crashing the script.
 
@@ -177,16 +177,16 @@ def resolve_package_metadata(package_name: str) -> dict:
         # If `top_level.txt` is missing, fall back to a normalized version of the package name.
         raw_tml = package_name.lower().replace('-', '_')
 
-    # FIX 1: TML Correction. Ensure TML is the import name, not an internal component.
+    # --- 2a. TML Heuristic Refinement ---
+    # Ensure TML is the user-facing import name, not an internal component.
     # This section handles edge cases where the TML from `top_level.txt` might be
-    # ambiguous or incorrect. It applies heuristics to select the correct import name.
+    # ambiguous (e.g., `_cffi_backend`) or incorrect for our purposes.
+    # It applies heuristics to select the correct import name.
     package_name_normalized = package_name.lower().replace('-', '_')
     top_level_module = raw_tml
     
-    # Specific fix for known complex packages where TML is not the package name
     if not top_level_module:
         # If the TML is empty (e.g., pyodbc), default to package name
-        # Specific fix for known complex packages where TML is not the package name
         top_level_module = package_name_normalized
     # General fallback: if the derived TML looks like a sub-module, but the package name is the real import name.
     elif top_level_module.startswith('_') and top_level_module != package_name_normalized:
@@ -269,9 +269,11 @@ def resolve_package_metadata(package_name: str) -> dict:
             # If import fails, fall back to calculated root
             resolved_path = dist_root 
 
-    # FIX 2: Final Check for Single-File Modules (like pyodbc)
+    # --- 4a. Path Resolution Final Fallback ---
+    # Final check for Single-File Modules (e.g., pyodbc) where previous directory-based
+    # lookups might have failed.
     if resolved_path == "Could not determine root via files.":
-        # We try to locate the TML's entry point file to get a reliable absolute root path.
+        # Attempt to locate the TML's entry point file directly to derive a reliable absolute root path.
         try:
             # The TML (e.g., 'pyodbc') should be a file/directory in the installation root.
             # Locate the file and get its parent directory path.
