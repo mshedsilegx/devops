@@ -1,6 +1,6 @@
-#!/var/opt/python314/bin/python3.14
+#!/usr/bin/env python3
 # ------------------------------------------
-# /var/opt/apps/system/python_sysdiags.py
+# python_sysdiags.py
 # v1.3.6xg  2025/10/15  XdG / MIS Center
 # ------------------------------------------
 """
