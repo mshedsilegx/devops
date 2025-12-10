@@ -58,22 +58,51 @@ def get_package_location_category(install_path):
         
     real_install_path = os.path.realpath(install_path)
     
-    # 1. Custom: Check MODULEPATH
+    # 1. Custom: Check MODULEPATH (Priority 1)
     module_path_env = os.environ.get('MODULEPATH')
     if module_path_env:
         for path in module_path_env.split(os.pathsep):
             if path and real_install_path.startswith(os.path.realpath(path)):
                 return "custom"
 
-    # 2. System: Check system-wide site-packages
-    for path in site.getsitepackages():
-        if real_install_path.startswith(os.path.realpath(path)):
-            return "system"
+    # 2. Custom: Check PYTHONPATH (Priority 2)
+    pythonpath = os.environ.get('PYTHONPATH')
+    if pythonpath:
+        for path in pythonpath.split(os.pathsep):
+            if path and real_install_path.startswith(os.path.realpath(path)):
+                return "custom"
 
-    # 3. User: Check user's home directory (e.g. ~/.local)
-    home_dir = os.path.expanduser('~')
-    if real_install_path.startswith(home_dir):
-        return "user"
+    # 3. User: Check user's home directory site packages
+    try:
+        user_site = site.getusersitepackages()
+        user_paths = [user_site] if isinstance(user_site, str) else (user_site if user_site else [])
+        for path in user_paths:
+             if real_install_path.startswith(os.path.realpath(path)):
+                 return "user"
+    except (AttributeError, TypeError):
+        # Fallback to home dir check if site.getusersitepackages is problematic
+        home_dir = os.path.expanduser('~')
+        if real_install_path.startswith(home_dir):
+            return "user"
+
+    # 4. System: Check Virtual Environment (Treat as system/standard for this env)
+    if hasattr(sys, 'real_prefix') or (hasattr(sys, 'base_prefix') and sys.base_prefix != sys.prefix):
+         if real_install_path.startswith(os.path.realpath(sys.prefix)):
+             return "system"
+
+    # 5. System: Check site.getsitepackages()
+    try:
+        for path in site.getsitepackages():
+            if real_install_path.startswith(os.path.realpath(path)):
+                return "system"
+    except (AttributeError, TypeError):
+        pass
+
+    # 6. System: Check sys.path fallback for 'site-packages'
+    for path in sys.path:
+        if path and ('site-packages' in path or 'dist-packages' in path):
+            if real_install_path.startswith(os.path.realpath(path)):
+                return "system"
 
     return "unknown"
 
