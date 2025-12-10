@@ -14,26 +14,29 @@ The script is designed to be a definitive source of truth, overcoming the limita
 
 ## 2. Architecture and Design Choices
 
-The script's architecture is centered around a modular, function-based design that prioritizes accuracy and reliability.
+The script's architecture follows a clean separation of concerns, distinguishing the command-line interface from the core analytical logic.
+
+-   **`python_pkg_info.py`**: This script serves as the user-facing command-line entry point. Its primary responsibilities are parsing arguments (`argparse`), calling the core logic from the shared utility module, and formatting the results for display (either as text or JSON).
+-   **`python_pkg_utils.py`**: This is a shared module that contains the complex, reusable logic for package analysis. It is also used by other tools in this repository (like `python_pkg_upgrader.py`) to ensure consistent and reliable package metadata resolution.
 
 ### Core Components:
 
-1.  **`resolve_package_metadata(package_name)`**: This is the central function of the script. It orchestrates the entire data-gathering process.
+The core logic resides within `python_pkg_utils.py` and includes the following key functions:
+
+1.  **`resolve_package_metadata(package_name)`**: This is the central function of the utility module. It orchestrates the entire data-gathering process.
     -   **Metadata First:** It begins by using `importlib.metadata` to retrieve the core distribution information. This is the standard and most reliable way to access package metadata in modern Python (3.8+).
-    -   **Definitive Path Resolution Logic:** The most critical design choice is the multi-step process for resolving the package's installation path, which avoids unreliable methods.
-        1.  **`top_level.txt` Analysis & Heuristics:** It first reads the `top_level.txt` file to find the importable module name. It then applies heuristic refinement to ensure the name is user-facing (e.g., handling cases where the internal module starts with `_` or is empty).
-        2.  **Calculated Root Path:** The script calculates the installation root directory by locating the `.dist-info` folder and moving up one level. This is more reliable than trusting the `dist.location` attribute, which can be inconsistent.
-        3.  **Constructed Path:** It attempts to construct the final path by combining the calculated root with the top-level module name. This works for the majority of standard packages.
-        4.  **`importlib.util.find_spec` Fallback:** If the constructed path does not exist, it falls back to `importlib.util.find_spec()`. This leverages Python's import system directly to find the module, crucial for namespace packages and editable installs.
-        5.  **Single-File Module Safety Net:** As a final resort for single-file modules (e.g., `pyodbc`), it attempts to locate the specific entry point file directly within the distribution files if directory-based lookups fail.
-2.  **`get_latest_version_from_pypi(package_name)`**: This function handles external data fetching.
+    -   **Definitive Path Resolution Logic:** It implements a robust, multi-step process to find the package's exact on-disk location, handling standard packages, editable installs, and other edge cases by intelligently using `top_level.txt`, the distribution's file list, and `importlib.util.find_spec`.
+2.  **`get_latest_version_from_pypi(package_name)`**: This function handles external data fetching to find the newest version of the package.
     -   **Network Resilience:** It uses the `requests` library to query the official PyPI JSON API. To prevent the script from failing if `requests` is not installed, it includes a `DummyRequests` class. This ensures the script can still provide local metadata even without network access, returning a clear error message for the "latest version" field.
-3.  **`get_module_type(dist)`**: A helper function that inspects a package's file manifest to determine if it contains binary/compiled files (`.so`, `.pyd`). This categorizes the package as either `platlib` (platform-specific) or `purelib` (pure Python).
-4.  **`main()` and `display_results()`**: These functions manage the command-line interface.
-    -   **`argparse` for CLI:** The script uses the standard `argparse` module for robust and user-friendly command-line argument parsing.
-    -   **Separation of Logic and Presentation:** The core logic in `resolve_package_metadata` returns a structured dictionary. The `display_results` function is solely responsible for formatting this data, either as human-readable text or as a JSON string. This separation makes the core logic reusable and easier to test.
+3.  **`get_module_type(dist)`**: A helper that inspects a package's file manifest to determine if it contains binary/compiled files (`.so`, `.pyd`), categorizing it as `platlib` or `purelib`.
+4.  **`get_package_location_category(install_path)`**: A helper that classifies the installation location as `system`, `user`, or `custom` based on standard paths and environment variables like `PYTHONPATH`.
+
+The `python_pkg_info.py` script itself contains:
+1.  **`main()`**: Parses command-line arguments.
+2.  **`display_results()`**: Formats the dictionary returned by `resolve_package_metadata` into human-readable text or JSON.
 
 ### Key Design Principles:
+- **Modularity and Reusability:** The core logic is centralized in `python_pkg_utils.py` so that it can be shared, ensuring consistent behavior across different tools.
 - **Accuracy over Simplicity:** The path resolution logic is intentionally complex to handle edge cases correctly.
 - **Resilience:** The script is designed to function without network access and provides clear error messages.
 - **Usability:** It offers multiple output formats (`text`, `json`) and verbosity levels (`--quiet`, `--verbose`) to suit different use cases.
@@ -109,7 +112,9 @@ Dependencies:
 ```
 
 ### JSON Output for Automation
-To get the output in a machine-readable JSON format. This is ideal for use in other scripts.
+
+#### Standard JSON Output
+To get the primary fields in a machine-readable format. This is ideal for most automation tasks.
 
 **Command:**
 ```sh
@@ -124,7 +129,28 @@ python3 python_pkg_info.py --package cffi --json
     "exact_path": "/usr/lib/python3/dist-packages/cffi",
     "current_version": "1.15.1",
     "latest_version": "1.16.0",
+    "module_type": "platlib (Binary/Compiled C/C++)"
+}
+```
+
+#### Verbose JSON Output
+To get all available metadata in JSON format, including dependencies, author, and license information.
+
+**Command:**
+```sh
+python3 python_pkg_info.py --package cffi --json --verbose
+```
+
+**Example JSON Output:**
+```json
+{
+    "package_name": "cffi",
+    "import_name": "cffi",
+    "exact_path": "/usr/lib/python3/dist-packages/cffi",
+    "current_version": "1.15.1",
+    "latest_version": "1.16.0",
     "module_type": "platlib (Binary/Compiled C/C++)",
+    "location_category": "system",
     "metadata_summary": "Foreign Function Interface for Python calling C code.",
     "required_python_version": ">=3.6",
     "license": "MIT",
