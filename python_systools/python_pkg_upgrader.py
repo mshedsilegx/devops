@@ -32,6 +32,9 @@ import sys
 import json
 import subprocess
 import importlib.metadata
+import os
+import shutil
+from pathlib import Path
 from python_pkg_utils import resolve_package_metadata
 
 def list_all_packages(json_output=False):
@@ -88,6 +91,60 @@ def get_outdated_packages():
         print(f"Error checking for outdated packages: {e}", file=sys.stderr)
         return []
 
+def remove_old_package_from_target(package_name, target_path):
+    """
+    Removes the old version of a package from the target directory
+    to prevent duplicate metadata directories (shadowing).
+
+    Args:
+        package_name (str): The name of the package to remove.
+        target_path (str): The target directory where the package is installed.
+    """
+    abs_target = os.path.realpath(os.path.abspath(target_path))
+
+    # 1. Resolve and remove the package source (module/package)
+    metadata = resolve_package_metadata(package_name)
+    if 'error' not in metadata:
+        install_path = metadata['exact_path']
+        # Check if the package is actually installed in the target directory
+        if install_path and os.path.exists(install_path):
+            parent_dir = os.path.dirname(install_path)
+
+            # Normalize paths for comparison
+            if os.path.realpath(parent_dir) == abs_target:
+                try:
+                    if os.path.isdir(install_path):
+                        shutil.rmtree(install_path)
+                    elif os.path.isfile(install_path):
+                        os.remove(install_path)
+                    # print(f"Removed old package source: {install_path}")
+                except OSError as e:
+                    print(f"Warning: Failed to remove {install_path}: {e}", file=sys.stderr)
+
+    # 2. Remove dist-info/egg-info directory
+    try:
+        dist = importlib.metadata.distribution(package_name)
+        files = dist.files
+        if files:
+            # Find the path to .dist-info
+            dist_info_file = next((f for f in files if '.dist-info' in str(f)
+                                   or '.egg-info' in str(f)), None)
+            if dist_info_file:
+                full_path = dist.locate_file(dist_info_file)
+                # Walk up to the .dist-info directory
+                path_obj = Path(full_path)
+                while path_obj.name and not (path_obj.name.endswith('.dist-info')
+                                             or path_obj.name.endswith('.egg-info')):
+                    path_obj = path_obj.parent
+
+                if path_obj.name.endswith('.dist-info') or path_obj.name.endswith('.egg-info'):
+                    # Check if it is in target path
+                    if os.path.realpath(path_obj.parent) == abs_target:
+                        # print(f"Removed old metadata: {path_obj}")
+                        shutil.rmtree(path_obj)
+    except (importlib.metadata.PackageNotFoundError, OSError):
+        pass
+
 def upgrade_modules(simulate=False, json_output=False, target_path=None):  # pylint: disable=too-many-branches
     """
     Upgrades all installed Python modules.
@@ -127,6 +184,9 @@ def upgrade_modules(simulate=False, json_output=False, target_path=None):  # pyl
 
         if target_path:
             command.extend(['--target', target_path])
+            # Pre-cleanup: Remove old versions from target path to avoid duplicates
+            for pkg_name in package_names:
+                remove_old_package_from_target(pkg_name, target_path)
 
         command.extend(package_names)
 

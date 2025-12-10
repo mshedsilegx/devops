@@ -36,7 +36,7 @@ To prevent this, use the `--target` flag to force the upgrade into the correct d
 
 ```bash
 # Force upgrades into the custom module directory
-python python_pkg_upgrader.py --upgrade --target /u01/apps/python314/lib/modules3.14
+python python_pkg_upgrader.py --upgrade --target /path/to/custom/library
 ```
 
 **Note**: `--list` and `--upgrade` are mutually exclusive.
