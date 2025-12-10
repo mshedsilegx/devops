@@ -34,19 +34,26 @@ import subprocess
 import importlib.metadata
 from python_pkg_utils import resolve_package_metadata
 
-def list_all_packages():
+def list_all_packages(json_output=False):
     """
     Lists all installed packages with their metadata.
     """
-    header = f"{'Package':<30} {'Version':<15} {'Location':<10} {'Type':<18} {'Path'}"
-    print(header)
-    print("=" * (len(header) + 5))
-
     dists = importlib.metadata.distributions()
+    package_list = []
+    
     for dist in sorted(dists, key=lambda d: d.metadata['name'].lower()):
         package_name = dist.metadata['name']
         metadata = resolve_package_metadata(package_name)
         if 'error' not in metadata:
+            package_list.append(metadata)
+
+    if json_output:
+        print(json.dumps(package_list, indent=4))
+    else:
+        header = f"{'Package':<30} {'Version':<15} {'Location':<10} {'Type':<18} {'Path'}"
+        print(header)
+        print("=" * (len(header) + 5))
+        for metadata in package_list:
             print(f"{metadata['package_name']:<30} {metadata['current_version']:<15} {metadata['location_category']:<10} {metadata['module_type']:<18} {metadata['exact_path']}")
 
 def get_outdated_packages():
@@ -63,28 +70,32 @@ def get_outdated_packages():
         print(f"Error checking for outdated packages: {e}", file=sys.stderr)
         return []
 
-def upgrade_modules(simulate=False, target=None):
+def upgrade_modules(simulate=False, json_output=False):
     """Upgrades all installed Python modules."""
     outdated_packages = get_outdated_packages()
 
     if not outdated_packages:
-        print("All packages are up to date.")
+        if json_output and simulate:
+            print(json.dumps([]))
+        else:
+            print("All packages are up to date.")
         return
 
     if simulate:
-        print(f"{'Module':<30} {'Old Version':<15} {'New Version':<15}")
-        print("="*60)
-        for package in outdated_packages:
-            name = package['name']
-            current_version = package['version']
-            latest_version = package['latest_version']
-            print(f"{name:<30} {current_version:<15} {latest_version:<15}")
+        if json_output:
+            print(json.dumps(outdated_packages, indent=4))
+        else:
+            print(f"{'Module':<30} {'Old Version':<15} {'New Version':<15}")
+            print("="*60)
+            for package in outdated_packages:
+                name = package['name']
+                current_version = package['version']
+                latest_version = package['latest_version']
+                print(f"{name:<30} {current_version:<15} {latest_version:<15}")
     else:
         package_names = [pkg['name'] for pkg in outdated_packages]
         print(f"Upgrading {len(package_names)} packages...")
         command = [sys.executable, '-m', 'pip', 'install', '--upgrade'] + package_names
-        if target:
-            command.extend(['--target', target])
         
         try:
             with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as proc:
@@ -126,9 +137,9 @@ def main():
         help='Simulate the upgrade process.'
     )
     parser.add_argument(
-        '--target',
-        type=str,
-        help='Specify a target directory for module upgrades.'
+        '--json',
+        action='store_true',
+        help='Output the results in JSON format (works with --list or --upgrade --simulate).'
     )
     
     if len(sys.argv) == 1:
@@ -138,9 +149,9 @@ def main():
     args = parser.parse_args()
     
     if args.list:
-        list_all_packages()
+        list_all_packages(json_output=args.json)
     elif args.upgrade:
-        upgrade_modules(simulate=args.simulate, target=args.target)
+        upgrade_modules(simulate=args.simulate, json_output=args.json)
 
 if __name__ == "__main__":
     main()
