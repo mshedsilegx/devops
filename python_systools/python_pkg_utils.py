@@ -250,6 +250,17 @@ def resolve_package_metadata(package_name: str) -> dict:
     
     requires_dist = metadata_dict.get('Requires-Dist')
     
+    # Process License: Truncate at first newline or 65 chars
+    raw_license = metadata_dict.get('License', metadata_dict.get('Classifier', 'N/A'))
+    if raw_license and raw_license != 'N/A':
+        first_line = str(raw_license).split('\n')[0]
+        if len(first_line) > 65:
+            license_text = first_line[:65] + "..."
+        else:
+            license_text = first_line
+    else:
+        license_text = 'N/A'
+
     return {
         "package_name": package_name,
         "import_name": top_level_module, 
@@ -262,7 +273,7 @@ def resolve_package_metadata(package_name: str) -> dict:
         # Verbose/Additional Fields
         "metadata_summary": metadata_dict.get('Summary', 'N/A'),
         "required_python_version": metadata_dict.get('Requires-Python', 'N/A'),
-        "license": metadata_dict.get('License', metadata_dict.get('Classifier', 'N/A')),
+        "license": license_text,
         "author": metadata_dict.get('Author', 'N/A'),
         "homepage": metadata_dict.get('Home-page', 'N/A'),
         "required_dependencies": requires_dist if isinstance(requires_dist, list) else ([requires_dist] if requires_dist else [])
