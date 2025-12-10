@@ -112,7 +112,29 @@ Dependencies:
 ```
 
 ### JSON Output for Automation
-To get the output in a machine-readable JSON format. This is ideal for use in other scripts.
+
+#### Standard JSON Output
+To get the primary fields in a machine-readable format. This is ideal for most automation tasks.
+
+**Command:**
+```sh
+python3 python_pkg_info.py --package cffi --json
+```
+
+**Example JSON Output:**
+```json
+{
+    "package_name": "cffi",
+    "import_name": "cffi",
+    "exact_path": "/usr/lib/python3/dist-packages/cffi",
+    "current_version": "1.15.1",
+    "latest_version": "1.16.0",
+    "module_type": "platlib (Binary/Compiled C/C++)"
+}
+```
+
+#### Verbose JSON Output
+To get all available metadata in JSON format, including dependencies, author, and license information.
 
 **Command:**
 ```sh
