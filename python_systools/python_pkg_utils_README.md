@@ -1,4 +1,4 @@
-# DevOps Scripts and Utilities: `python_pkg_utils.py` Module
+# Python Utilities: `python_pkg_utils.py` Module
 
 ## 1. Application Overview and Objectives
 
