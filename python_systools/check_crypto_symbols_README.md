@@ -28,6 +28,7 @@ The script utilizes `argparse` for robust argument handling.
 | Argument | Type | Required | Default | Description |
 | :--- | :--- | :--- | :--- | :--- |
 | `libcrypto_path` | String | Yes | N/A | The full absolute path to the custom `libcrypto` shared library file (e.g., `/var/opt/openssl36/lib64/libcrypto36`). |
+| `--json` | Flag | No | False | Output results in JSON format instead of plain text. |
 
 ## Examples on How to Use
 
@@ -42,30 +43,40 @@ python3 check_crypto_symbols.py /var/opt/openssl36/lib64/libcrypto36
 If the library is found and symbols are present:
 
 ```text
+Python Linked OpenSSL: OpenSSL 3.0.8 7 Feb 2023
+
 --- Checking for OpenSSL symbols ---
 Attempting to load library: /var/opt/openssl36/lib64/libcrypto36
 Library loaded successfully.
+Detected Library Version: OpenSSL 3.0.8 7 Feb 2023
 [PASS] Symbol 'EVP_blake2b' found in the library.
 [PASS] Symbol 'EVP_blake2b512' found in the library.
 
 --- Checking hashlib behavior ---
 hashlib module loaded successfully.
 [PASS] hashlib.blake2b() call succeeded.
+
+All checks PASSED.
 ```
 
 ### Expected Output (Failure/Debug Scenario)
 If the library is missing the standard symbol or hashlib fails (common in broken builds):
 
 ```text
+Python Linked OpenSSL: OpenSSL 1.1.1k  25 Mar 2021
+
 --- Checking for OpenSSL symbols ---
 Attempting to load library: /usr/lib64/libcrypto.so.1.1
 Library loaded successfully.
+Detected Library Version: OpenSSL 1.1.1k  25 Mar 2021
 [FAIL] Symbol 'EVP_blake2b' not found in the library.
 [PASS] Symbol 'EVP_blake2b512' found in the library.
 
 --- Checking hashlib behavior ---
 hashlib module loaded successfully.
 [FAIL] ValueError: [digital envelope routines] unsupported. This is also expected.
+
+Some checks FAILED.
 ```
 
 ### Getting Help

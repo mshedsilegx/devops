@@ -157,7 +157,7 @@ def main():  # pylint: disable=too-many-branches
 
     # Check for command-line arguments
     if len(sys.argv) < 2:
-        print("Usage: python_module_parser.py <directory_to_scan>", file=sys.stderr)
+        print("Usage: python_pkg_parser.py <directory_to_scan>", file=sys.stderr)
         sys.exit(1)
 
     root_directory = sys.argv[1]
