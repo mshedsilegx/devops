@@ -1,0 +1,234 @@
+# python_pkg_utils.py
+# Shared utility functions for Python system tools
+# ----------------------------------------------
+
+import importlib.metadata
+import importlib.util
+import os
+import sys
+from pathlib import Path
+import json
+import site
+
+# Define a dummy class for when requests is not installed.
+class DummyRequests:
+    @staticmethod
+    def get(url, timeout):
+        class DummyResponse:
+            status_code = 503
+            @staticmethod
+            def json():
+                return {'info': {'version': 'Error: requests not installed'}}
+        return DummyResponse()
+
+# Third-Party Imports
+try:
+    import requests
+except ImportError:
+    requests = DummyRequests()
+
+# ====================================================================
+# CONFIGURATION CONSTANTS
+# ====================================================================
+
+# Minimum required Python version tuple (3.8 is the minimum for importlib.metadata)
+MIN_PYTHON_VERSION_TUPLE = (3, 8)
+
+# Base URL for the PyPI JSON API lookup
+PYPI_JSON_URL = "https://pypi.org/pypi/{package_name}/json"
+
+# Module-level debug flag
+DEBUG_MODE = False
+
+def set_debug_mode(enabled: bool):
+    """Sets the debug mode for the utility module."""
+    global DEBUG_MODE
+    DEBUG_MODE = enabled
+
+# ====================================================================
+# SHARED FUNCTIONS
+# ====================================================================
+
+def get_package_location_category(install_path):
+    """
+    Determines if a package is local, system, or custom.
+    """
+    if not install_path or not os.path.exists(install_path):
+        return "unknown"
+        
+    real_install_path = os.path.realpath(install_path)
+    home_dir = os.path.expanduser('~')
+
+    # 1. If inside the user's home directory, it's 'local'.
+    if real_install_path.startswith(home_dir):
+        return "local"
+
+    # 2. If in a system-wide site-packages directory, it's 'system'.
+    for path in site.getsitepackages():
+        if real_install_path.startswith(os.path.realpath(path)):
+            return "system"
+
+    # 3. Otherwise, it's 'custom'.
+    return "custom"
+
+def get_latest_version_from_pypi(package_name: str) -> str:
+    """
+    Fetches the latest published version of a package from the PyPI JSON API.
+    """
+    if isinstance(requests, DummyRequests):
+        return "Error: requests library not found for network lookup"
+
+    try:
+        url = PYPI_JSON_URL.format(package_name=package_name)
+        response = requests.get(url, timeout=5)
+        
+        if response.status_code == 200:
+            data = response.json()
+            return data['info']['version']
+        elif response.status_code == 404:
+            return "Package not found on PyPI"
+        else:
+            return f"Error: HTTP {response.status_code}"
+            
+    except requests.exceptions.RequestException:
+        return "Error: Network failure"
+    except Exception:
+        return "Error: Metadata parsing failure"
+
+def get_module_type(dist: importlib.metadata.Distribution) -> str:
+    """
+    Determines if a package is purelib or platlib by checking for compiled files.
+    """
+    compiled_extensions = ('.so', '.pyd', '.dll', '.dylib')
+    
+    if dist.files is None:
+        return "Type Unknown (No File Listing)"
+        
+    for file in dist.files:
+        if Path(str(file)).suffix.lower() in compiled_extensions:
+            return "platlib (Binary/Compiled C/C++)"
+            
+    return "purelib (Pure Python code)"
+
+def resolve_package_metadata(package_name: str) -> dict:
+    """
+    Resolves all package properties, including path and versions, using definitive file-based logic.
+    """
+    global DEBUG_MODE
+    
+    if DEBUG_MODE:
+        print("\n--- DEBUG: Path Resolution Start ---")
+    
+    if sys.version_info < MIN_PYTHON_VERSION_TUPLE:
+        return {"error": f"Python {MIN_PYTHON_VERSION_TUPLE[0]}.{MIN_PYTHON_VERSION_TUPLE[1]} or newer required for metadata handling."}
+        
+    # --- 1. Get Distribution Metadata ---
+    try:
+        dist = importlib.metadata.distribution(package_name)
+        current_version = dist.version
+        metadata_dict = dist.metadata
+        
+    except importlib.metadata.PackageNotFoundError:
+        return {"error": f"Package '{package_name}' not found."}
+
+    # --- 2. Determine Top-Level Module (TML) ---
+    top_level_text = dist.read_text('top_level.txt')
+    
+    if top_level_text:
+        # Use the first line as the primary TML.
+        raw_tml = top_level_text.splitlines()[0].strip()
+    else:
+        raw_tml = package_name.lower().replace('-', '_')
+
+    # --- 2a. TML Heuristic Refinement ---
+    package_name_normalized = package_name.lower().replace('-', '_')
+    top_level_module = raw_tml
+    
+    if not top_level_module:
+        top_level_module = package_name_normalized
+    elif top_level_module.startswith('_') and top_level_module != package_name_normalized:
+        top_level_module = package_name_normalized
+    elif package_name_normalized.startswith(top_level_module) and len(package_name_normalized) > len(top_level_module):
+         pass
+    else:
+        if not top_level_module or not importlib.util.find_spec(top_level_module):
+             top_level_module = package_name_normalized
+
+    # --- 3. Determine Installation Root (dist_root) ---
+    dist_root = "Could not determine root."
+    
+    try:
+        if dist.files:
+            dist_info_folder_name = [str(f).split(os.sep)[0] for f in dist.files if str(f).endswith('.dist-info') or str(f).endswith('.egg-info')][0]
+            dist_root = str(Path(os.path.abspath(dist.locate_file(Path(dist_info_folder_name)))).parent)
+    except Exception:
+        dist_root = "Could not determine root via files."
+
+    if DEBUG_MODE:
+        print(f"DEBUG 1: Top-Level Module (TML): {top_level_module}")
+        print(f"DEBUG 1: Distribution Root (Calculated): {dist_root}")
+
+    # --- 4. Locate the installation folder (FINAL PATH LOGIC) ---
+    resolved_path = "Could not resolve path."
+    
+    if dist_root != "Could not determine root." and Path(dist_root).is_dir():
+        potential_path = Path(dist_root) / top_level_module
+        if DEBUG_MODE:
+            print(f"DEBUG 2: Constructed Module Path: {potential_path}")
+            print(f"DEBUG 2: Constructed Path Exists?: {potential_path.is_dir()}")
+        
+        if potential_path.is_dir():
+            resolved_path = str(potential_path)
+        else:
+             resolved_path = "Falling through to find_spec."
+
+    if resolved_path == "Could not resolve path." or resolved_path == "Falling through to find_spec.":
+        try:
+            spec = importlib.util.find_spec(top_level_module)
+            
+            if spec and spec.submodule_search_locations:
+                resolved_path = spec.submodule_search_locations[0]
+            elif spec and spec.origin:
+                resolved_path = os.path.dirname(spec.origin)
+            else:
+                 resolved_path = dist_root 
+        except ImportError:
+            resolved_path = dist_root 
+
+    # --- 4a. Path Resolution Final Fallback ---
+    if resolved_path == "Could not determine root via files.":
+        try:
+            potential_root_path = str(Path(os.path.abspath(dist.locate_file(Path(top_level_module)))).parent)
+            if Path(potential_root_path).is_dir():
+                resolved_path = potential_root_path
+        except Exception:
+             pass 
+
+    if DEBUG_MODE:
+        print(f"DEBUG FINAL: Resolved Path Before Return: {resolved_path}")
+        print("--- DEBUG: Path Resolution End ---\n")
+
+    # --- 5. Gather Remaining Metadata ---
+    latest_version = get_latest_version_from_pypi(package_name)
+    module_type = get_module_type(dist)
+    location_category = get_package_location_category(dist_root)
+    
+    requires_dist = metadata_dict.get('Requires-Dist')
+    
+    return {
+        "package_name": package_name,
+        "import_name": top_level_module, 
+        "exact_path": resolved_path, 
+        "current_version": current_version,
+        "latest_version": latest_version,
+        "module_type": module_type,
+        "location_category": location_category,
+        
+        # Verbose/Additional Fields
+        "metadata_summary": metadata_dict.get('Summary', 'N/A'),
+        "required_python_version": metadata_dict.get('Requires-Python', 'N/A'),
+        "license": metadata_dict.get('License', metadata_dict.get('Classifier', 'N/A')),
+        "author": metadata_dict.get('Author', 'N/A'),
+        "homepage": metadata_dict.get('Home-page', 'N/A'),
+        "required_dependencies": requires_dist if isinstance(requires_dist, list) else ([requires_dist] if requires_dist else [])
+    }
