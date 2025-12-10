@@ -5,14 +5,18 @@
 # ----------------------------------------------
 
 # -*- coding: utf-8 -*-
-# This script defines a function to test the load status and generic soundness of a Python module.
+"""
+This script defines a function to test the load status and generic soundness of a Python module.
+It performs various checks including location, language type, docstrings, versioning,
+public API definition, and more.
+"""
 
 import sys
 import argparse
 import inspect
 import warnings
 import time
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 import importlib.metadata
 import importlib.util
 import importlib
@@ -142,7 +146,7 @@ def print_report(results: List[Dict[str, Any]]):
         results: A list of dictionaries, where each dictionary is a check result.
     """
     print("\n--- Generic Soundness Checks (One Line Per Test) ---")
-    
+
     for r in results:
         summary = f"({r['num']:>2}) {r['status_tag']:<6} {r['title']}: {r['detail']}"
 
@@ -158,7 +162,8 @@ def print_report(results: List[Dict[str, Any]]):
                 for detail_line in r['sub_details']:
                     parts = detail_line.split(':', 1)
                     if len(parts) == 2:
-                        prefix = parts[0].strip().title().replace("Optional/Conditional", "Optional")
+                        prefix = parts[0].strip().title().replace("Optional/Conditional",
+                                                                  "Optional")
                         print(f"  - {prefix}: {parts[1].strip()}")
         else:
             # General case for other checks with potential sub-details
@@ -172,16 +177,18 @@ def print_report(results: List[Dict[str, Any]]):
 def print_performance_check(analysis: 'ModuleAnalysis'):
     """Prints the import performance check results."""
     print("\n--- Performance Check ---")
-    EXCELLENT_PERF_THRESHOLD = 0.1
+    excellent_perf_threshold = 0.1
     duration = analysis.import_duration
-    
-    if duration < EXCELLENT_PERF_THRESHOLD:
-        tag, status, output = "[PASS]", "Excellent (Fast startup)", f"{duration:.4f} s < {EXCELLENT_PERF_THRESHOLD:.1f} s."
+
+    if duration < excellent_perf_threshold:
+        tag, status, output = ("[PASS]", "Excellent (Fast startup)",
+                               f"{duration:.4f} s < {excellent_perf_threshold:.1f} s.")
     elif duration < 1.0:
         tag, status, output = "[INFO]", "Acceptable", f"{duration:.4f} seconds."
     else:
-        tag, status, output = "[WARN]", "Slow (Potential startup bottleneck)", f"{duration:.4f} seconds."
-        
+        tag, status, output = ("[WARN]", "Slow (Potential startup bottleneck)",
+                               f"{duration:.4f} seconds.")
+
     print(f"   {tag} Import Performance: {status} - {output}")
 
 def print_environment_check():
@@ -191,10 +198,11 @@ def print_environment_check():
         py_version = sys.version.split()[0]
         impl_name = sys.implementation.name.capitalize()
         threading_model = "Varies (Non-CPython/Custom)"
-        
+
         if impl_name == "Cpython":
             is_gil_active = hasattr(sys.flags, 'gil') and getattr(sys.flags, 'gil', 0) == 1
-            threading_model = "Global Interpreter Lock (GIL) Active" if is_gil_active else "Free-Threading Active (GIL Absent)"
+            threading_model = ("Global Interpreter Lock (GIL) Active" if is_gil_active else
+                               "Free-Threading Active (GIL Absent)")
         elif impl_name == "Pypy":
             threading_model = "Software Transactional Memory (No GIL)"
         elif impl_name == "Jython":
@@ -203,10 +211,10 @@ def print_environment_check():
         print(f"   [INFO] Python Version: {py_version}")
         print(f"   [INFO] Threading Model: {threading_model}")
         print(f"   [INFO] Interpreter Implementation: {impl_name}")
-    except Exception:
+    except Exception:  # pylint: disable=broad-exception-caught
         print("   [WARN] Environment Info: Failed to retrieve interpreter version or details.")
 
-class ModuleAnalysis:
+class ModuleAnalysis:  # pylint: disable=too-many-instance-attributes
     # ----------------------------------------
     # Core Analysis Logic
     # ----------------------------------------
@@ -219,7 +227,7 @@ class ModuleAnalysis:
         Initializes the analysis by importing the module and gathering key data.
         This constructor acts as the main entry point for the analysis, orchestrating
         the import and initial data gathering steps.
-        
+
         Args:
             module_name (str): The name of the module to analyze.
 
@@ -259,7 +267,7 @@ class ModuleAnalysis:
 
         all_dir_members = dir(self.module_object)
         member_names = [m for m in all_dir_members if not m.startswith('__') or m == '__all__']
-        
+
         self.public_members = [m for m in member_names if not m.startswith('_')]
         self.private_members = [m for m in member_names if m.startswith('_') and m != '__all__']
         self.all_members = self.public_members + self.private_members
@@ -280,7 +288,7 @@ class ModuleAnalysis:
         """Check 1: Determines the module's file or package location."""
         file_path = getattr(self.module_object, '__file__', 'N/A')
         module_path = getattr(self.module_object, '__path__', None)
-        
+
         detail, status = "", ""
         if file_path != 'N/A':
             detail = f"File Path: {file_path}"
@@ -294,12 +302,13 @@ class ModuleAnalysis:
 
         return {"title": "Module File/Package Location", "status_tag": status, "detail": detail}
 
-    def analyze_language_type(self) -> Dict[str, Any]:
+    def analyze_language_type(self) -> Dict[str, Any]:  # pylint: disable=too-many-nested-blocks
         """Check 2: Determines the implementation language (Python, C-extension, etc.)."""
+        # pylint: disable=too-many-nested-blocks
         file_path = getattr(self.module_object, '__file__', 'N/A')
         module_path = getattr(self.module_object, '__path__', None)
         module_type = "Built-in/Unknown"
-        
+
         file_path_lower = file_path.lower()
         if file_path_lower.endswith(('.so', '.pyd', '.dll', '.dylib')):
             module_type = "C-Extension"
@@ -309,7 +318,8 @@ class ModuleAnalysis:
             module_type = "Pure Python (Namespace)"
 
         # Check for mixed-language packages
-        dirs_to_check = [os.path.dirname(file_path)] if '__init__.py' in file_path_lower else (list(module_path) if module_path else [])
+        dirs_to_check = ([os.path.dirname(file_path)] if '__init__.py' in file_path_lower
+                         else (list(module_path) if module_path else []))
         has_c_extensions_in_package = False
         if dirs_to_check and "Pure Python" in module_type:
             for d in dirs_to_check:
@@ -319,14 +329,18 @@ class ModuleAnalysis:
                             if filename.lower().endswith(('.so', '.pyd', '.dll', '.dylib')):
                                 has_c_extensions_in_package = True
                                 break
-                        if has_c_extensions_in_package: break
-                    except PermissionError: pass
+                        if has_c_extensions_in_package:
+                            break
+                    except PermissionError:
+                        pass
 
         if has_c_extensions_in_package:
             module_type = "Mixed (Python entry, uses C-extensions)"
-            
-        status = "[PASS]" if "C-Extension" in module_type or "Pure Python" in module_type or "Mixed" in module_type else "[INFO]"
-        return {"title": "Implementation Language Type", "status_tag": status, "detail": f"Identified as: {module_type}."}
+
+        status = ("[PASS]" if "C-Extension" in module_type or "Pure Python" in module_type or
+                  "Mixed" in module_type else "[INFO]")
+        return {"title": "Implementation Language Type", "status_tag": status,
+                "detail": f"Identified as: {module_type}."}
 
     def analyze_docstring(self) -> Dict[str, Any]:
         """Check 3: Checks for the presence and length of the module's docstring."""
@@ -348,7 +362,8 @@ class ModuleAnalysis:
         else:
             status = "[WARN]"
             detail = "Not found. Version tracking is absent (Recommended)."
-        return {"title": "Version Information (__version__)", "status_tag": status, "detail": detail}
+        return {"title": "Version Information (__version__)", "status_tag": status,
+                "detail": detail}
 
     def analyze_public_api(self) -> Dict[str, Any]:
         """Check 5: Checks for the __all__ attribute to define a public API."""
@@ -370,29 +385,32 @@ class ModuleAnalysis:
         sub_details = []
         if total_members > 0:
             private_ratio = len(self.private_members) / total_members * 100
-            detail = f"Total Members: {total_members} (Public: {len(self.public_members)}, Private: {len(self.private_members)})"
-            
+            detail = (f"Total Members: {total_members} (Public: {len(self.public_members)}, "
+                      f"Private: {len(self.private_members)})")
+
             if private_ratio > 70 and len(self.public_members) < 5:
                 status = "[WARN]"
                 rating_string_full = "alert, >= 70% and <5 public members"
             else:
                 status = "[PASS]"
                 rating_string_full = "reasonable, < 70% or >= 5 public members"
-            
+
             sub_details.append(f"Private member ratio: {private_ratio:.1f}%")
             sub_details.append(rating_string_full)
         else:
             status = "[INFO]"
             detail = "Module namespace is empty (Only built-in attributes found)."
-            
-        return {"title": "Object Definition Quality/Encapsulation", "status_tag": status, "detail": detail, "sub_details": sub_details}
+
+        return {"title": "Object Definition Quality/Encapsulation", "status_tag": status,
+                "detail": detail, "sub_details": sub_details}
 
     def analyze_api_surface_size(self) -> Dict[str, Any]:
         """Check 7: Checks if the public API surface is excessively large."""
-        PUBLIC_API_THRESHOLD = 150
-        if len(self.public_members) > PUBLIC_API_THRESHOLD:
+        public_api_threshold = 150
+        if len(self.public_members) > public_api_threshold:
             status = "[WARN]"
-            detail = f"Excessive size detected ({len(self.public_members)} members). Consider segmenting."
+            detail = (f"Excessive size detected ({len(self.public_members)} members). "
+                      "Consider segmenting.")
         else:
             status = "[PASS]"
             detail = f"Reasonable size ({len(self.public_members)} members)."
@@ -402,7 +420,8 @@ class ModuleAnalysis:
         """Check 8: Counts the number of public callable objects (functions/classes)."""
         if self.callables_to_analyze:
             status = "[PASS]"
-            detail = f"Found {len(self.callables_to_analyze)} public functions/classes, indicating functionality."
+            detail = (f"Found {len(self.callables_to_analyze)} public functions/classes, "
+                      "indicating functionality.")
         else:
             status = "[INFO]"
             detail = "No top-level public functions/classes found."
@@ -420,13 +439,15 @@ class ModuleAnalysis:
         else:
             status = "[PASS]"
             detail = "No warnings or deprecations detected."
-        return {"title": "Import Health (Warnings/Deprecations)", "status_tag": status, "detail": detail, "sub_details": sub_details}
+        return {"title": "Import Health (Warnings/Deprecations)", "status_tag": status,
+                "detail": detail, "sub_details": sub_details}
 
     def analyze_type_hint_coverage(self) -> Dict[str, Any]:
         """Check 10: Calculates the percentage of public callables with type hints."""
         total_callables = len(self.callables_to_analyze)
         if not total_callables:
-            return {"title": "Type Hint Coverage", "status_tag": "[INFO]", "detail": "No public functions or classes available for analysis."}
+            return {"title": "Type Hint Coverage", "status_tag": "[INFO]",
+                    "detail": "No public functions or classes available for analysis."}
 
         annotated_callables = 0
         for attr in self.callables_to_analyze:
@@ -441,15 +462,19 @@ class ModuleAnalysis:
                         break
             except (ValueError, TypeError):
                 pass
-        
+
         coverage = (annotated_callables / total_callables) * 100
         if coverage >= 75:
             status, detail = "[PASS]", f"Excellent ({coverage:.0f}% of public callables annotated)."
         elif coverage >= 30:
-            status, detail = "[WARN]", f"Moderate ({coverage:.0f}% of public callables annotated). Aim higher."
+            status, detail = ("[WARN]",
+                              f"Moderate ({coverage:.0f}% of public callables annotated). "
+                              "Aim higher.")
         else:
-            status, detail = "[INFO]", f"Low ({coverage:.0f}% of public callables annotated). Recommended for public APIs."
-            
+            status, detail = ("[INFO]",
+                              f"Low ({coverage:.0f}% of public callables annotated). "
+                              "Recommended for public APIs.")
+
         return {"title": "Type Hint Coverage", "status_tag": status, "detail": detail}
 
     def analyze_metadata_status(self) -> Dict[str, Any]:
@@ -458,36 +483,45 @@ class ModuleAnalysis:
             name = self.package_metadata.get('Name')
             version = self.package_metadata.get('Version')
             if name and version:
-                status, detail = "[PASS]", f"Found package '{name}' (v{version}) via importlib.metadata."
+                status, detail = ("[PASS]",
+                              f"Found package '{name}' (v{version}) via importlib.metadata.")
             else:
-                status, detail = "[WARN]", "Metadata found, but name/version information is incomplete."
+                status, detail = ("[WARN]",
+                                  "Metadata found, but name/version information is incomplete.")
         else:
-            status, detail = "[WARN]", "Package not found in distribution database (May be standalone/built-in)."
+            status, detail = ("[WARN]",
+                              "Package not found in distribution database "
+                              "(May be standalone/built-in).")
         return {"title": "Distribution Metadata Status", "status_tag": status, "detail": detail}
 
     def analyze_license_status(self) -> Dict[str, Any]:
         """Check 12: Checks for license information in package metadata."""
         if not self.package_metadata:
-            return {"title": "License Status", "status_tag": "[INFO]", "detail": "Could not retrieve package metadata."}
+            return {"title": "License Status", "status_tag": "[INFO]",
+                    "detail": "Could not retrieve package metadata."}
 
         license_text = self.package_metadata.get('License')
         if license_text:
-            match = re.search(r'(MIT|BSD|Apache|GPL|LGPL|Public Domain)', license_text, re.IGNORECASE)
-            detail = f"{match.group(1).upper()} License detected." if match else "Custom/Complex License detected."
+            match = re.search(r'(MIT|BSD|Apache|GPL|LGPL|Public Domain)', license_text,
+                              re.IGNORECASE)
+            detail = (f"{match.group(1).upper()} License detected." if match
+                      else "Custom/Complex License detected.")
             status = "[PASS]"
         else:
             status, detail = "[WARN]", "'License' field missing in package metadata."
-            
+
         return {"title": "License Status", "status_tag": status, "detail": detail}
 
     def analyze_dependencies(self) -> Dict[str, Any]:
         """Check 13: Analyzes mandatory and optional dependencies from metadata."""
         if not self.package_metadata:
-            return {"title": "Required Dependencies", "status_tag": "[INFO]", "detail": "Could not retrieve package metadata."}
+            return {"title": "Required Dependencies", "status_tag": "[INFO]",
+                    "detail": "Could not retrieve package metadata."}
 
         requires_dist = self.package_metadata.get_all('Requires-Dist')
         if not requires_dist:
-            return {"title": "Required Dependencies", "status_tag": "[PASS]", "detail": "No external package dependencies listed (Self-contained)."}
+            return {"title": "Required Dependencies", "status_tag": "[PASS]",
+                    "detail": "No external package dependencies listed (Self-contained)."}
 
         mandatory = set()
         optional = set()
@@ -499,32 +533,35 @@ class ModuleAnalysis:
                     optional.add(dep_name)
                 else:
                     mandatory.add(dep_name)
-        
+
         truly_optional = optional.difference(mandatory)
         num_mandatory, num_optional = len(mandatory), len(truly_optional)
         total_deps = num_mandatory + num_optional
 
         if total_deps == 0:
-            return {"title": "Required Dependencies", "status_tag": "[PASS]", "detail": "No external package dependencies listed (Self-contained)."}
+            return {"title": "Required Dependencies", "status_tag": "[PASS]",
+                    "detail": "No external package dependencies listed (Self-contained)."}
 
-        detail = f"Found {total_deps} unique external packages ({num_mandatory} mandatory, {num_optional} optional/conditional)."
+        detail = (f"Found {total_deps} unique external packages ({num_mandatory} mandatory, "
+                  f"{num_optional} optional/conditional).")
         sub_details = []
         if mandatory:
             sub_details.append(f"MANDATORY: {'; '.join(sorted(list(mandatory)))}")
         if truly_optional:
             sub_details.append(f"OPTIONAL/CONDITIONAL: {'; '.join(sorted(list(truly_optional)))}")
-            
-        return {"title": "Required Dependencies", "status_tag": "[INFO]", "detail": detail, "sub_details": sub_details}
+
+        return {"title": "Required Dependencies", "status_tag": "[INFO]", "detail": detail,
+                "sub_details": sub_details}
 
     def run_all_checks(self) -> List[Dict[str, Any]]:
         """
         Runs all the analysis checks in sequence and returns the collected results.
         This method orchestrates the execution of all individual checks.
-        
+
         Returns:
             A list of dictionaries, where each dictionary represents the result of a check.
         """
-        results = [
+        results_list = [
             self.analyze_location(),
             self.analyze_language_type(),
             self.analyze_docstring(),
@@ -540,34 +577,35 @@ class ModuleAnalysis:
             self.analyze_dependencies(),
         ]
         # Add a number to each result for presentation purposes
-        for i, result in enumerate(results):
+        for i, result in enumerate(results_list):
             result['num'] = i + 1
 
-        return results
+        return results_list
 
 if __name__ == "__main__":
     # ----------------------------------------
     # Main Execution Block
     # ----------------------------------------
-    
+
     parser = argparse.ArgumentParser(
-        description="Check if a specified Python module can be imported successfully and assess its generic soundness.",
+        description=("Check if a specified Python module can be imported successfully and "
+                     "assess its generic soundness."),
         epilog="Example usage: python python_module_tester.py requests"
     )
-    
+
     parser.add_argument(
         "module_name",
         type=str,
         nargs='?',
         help="The name of the module to test (e.g., 'requests', 'numpy')."
     )
-    
+
     parser.add_argument(
         "--checks-methodology",
         action='store_true',
         help="Display the methodology and rating explanations for all checks, then exit."
     )
-    
+
     args = parser.parse_args()
 
     if args.checks_methodology:
@@ -584,21 +622,22 @@ if __name__ == "__main__":
 
     try:
         print(f"Testing import of '{args.module_name}'...")
-        analysis = ModuleAnalysis(args.module_name)
+        mod_analysis = ModuleAnalysis(args.module_name)
         print(f"[OK] SUCCESS: Module '{args.module_name}' imported correctly.")
-        
-        results = analysis.run_all_checks()
-        
-        print_report(results)
-        print_performance_check(analysis)
+
+        check_results = mod_analysis.run_all_checks()
+
+        print_report(check_results)
+        print_performance_check(mod_analysis)
         print_environment_check()
 
     except ImportError as e:
         print("\n--- Import Failure ---")
         print(f"[FAIL] FAILURE: Module '{args.module_name}' could not be imported.")
         print(f"   Error: {e}")
-        print(f"   Suggestion: Ensure the package is installed (e.g., 'pip install {args.module_name}')")
-    except Exception as e:
+        print(f"   Suggestion: Ensure the package is installed (e.g., 'pip install "
+              f"{args.module_name}')")
+    except Exception as e:  # pylint: disable=broad-exception-caught
         print("\n--- Unexpected Failure ---")
         print(f"[FAIL] FAILURE: An unexpected error occurred while loading '{args.module_name}'.")
         print(f"   Error Type: {type(e).__name__}")

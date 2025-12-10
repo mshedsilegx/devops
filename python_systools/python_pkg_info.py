@@ -50,7 +50,7 @@ def display_results(metadata: dict, json_output: bool, quiet_mode: bool, verbose
     if 'error' in metadata:
         sys.stderr.write(f"ERROR: {metadata['error']}\n")
         return
-        
+
     # Handle JSON output.
     if json_output:
         if not verbose_mode:
@@ -61,33 +61,33 @@ def display_results(metadata: dict, json_output: bool, quiet_mode: bool, verbose
             output_data = {k: metadata[k] for k in standard_keys if k in metadata}
         else:
             output_data = metadata
-            
+
         print(json.dumps(output_data, indent=4))
     else:
         # Handle human-readable text output.
-        
+
         if not quiet_mode:
             print("\n--- Package Metadata ---")
-            
+
         print(f"Found Package:   {metadata['package_name']}")
         print(f"Import Name:     {metadata['import_name']}")
         print(f"Exact Path:      {metadata['exact_path']}")
-        
+
         if not quiet_mode:
             print("---")
-            
+
         print(f"Current Version: {metadata['current_version']}")
         print(f"Latest Version:  {metadata['latest_version']}")
         print(f"Module Type:     {metadata['module_type']}")
-        
+
         if verbose_mode:
             if not quiet_mode:
                 print("\n--- Dependencies & Licensing ---")
-            
+
             def format_list(items):
                 items = [str(item) for item in items]
                 return "\n" + "    " + "\n    ".join(items) if items else "None"
-            
+
             print(f"Summary:         {metadata['metadata_summary']}")
             print(f"License:         {metadata['license']}")
             print(f"Author:          {metadata['author']}")
@@ -105,13 +105,13 @@ def main():
     2. Calling the core logic to resolve package metadata.
     3. Passing the results to the display function for output.
     """
-    global DEBUG_MODE
-    
+
     # Set up the command-line argument parser.
     parser = argparse.ArgumentParser(
-        description="Locate the exact installation folder and retrieve metadata for a Python package."
+        description=("Locate the exact installation folder and retrieve metadata "
+                     "for a Python package.")
     )
-    
+
     # Define all the command-line arguments the script accepts.
     parser.add_argument(
         '--package',
@@ -119,7 +119,7 @@ def main():
         required=True,
         help="The name of the package as listed by 'pip list'."
     )
-    
+
     # Optional arguments for output control
     parser.add_argument(
         '--json',
@@ -141,19 +141,19 @@ def main():
         action='store_true',
         help='Display detailed path resolution debugging information.'
     )
-    
+
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-        
+
     args = parser.parse_args()
-    
+
     # Set the global debug flag in the utility module
     set_debug_mode(args.debug)
-    
+
     if not args.quiet and not args.json:
         print(f"Searching for: {args.package}")
-    
+
     metadata = resolve_package_metadata(args.package)
     display_results(metadata, args.json, args.quiet, args.verbose)
 

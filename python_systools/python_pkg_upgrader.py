@@ -44,7 +44,7 @@ def list_all_packages(json_output=False):
     # Retrieve all package distributions from the current environment.
     dists = importlib.metadata.distributions()
     package_list = []
-    
+
     # Sort distributions by package name for consistent ordering.
     for dist in sorted(dists, key=lambda d: d.metadata['name'].lower()):
         package_name = dist.metadata['name']
@@ -62,7 +62,9 @@ def list_all_packages(json_output=False):
         print(header)
         print("=" * (len(header) + 5))
         for metadata in package_list:
-            print(f"{metadata['package_name']:<30} {metadata['current_version']:<15} {metadata['location_category']:<10} {metadata['module_type']:<18} {metadata['exact_path']}")
+            print(f"{metadata['package_name']:<30} {metadata['current_version']:<15} "
+                  f"{metadata['location_category']:<10} {metadata['module_type']:<18} "
+                  f"{metadata['exact_path']}")
 
 def get_outdated_packages():
     """
@@ -86,7 +88,7 @@ def get_outdated_packages():
         print(f"Error checking for outdated packages: {e}", file=sys.stderr)
         return []
 
-def upgrade_modules(simulate=False, json_output=False):
+def upgrade_modules(simulate=False, json_output=False):  # pylint: disable=too-many-branches
     """
     Upgrades all installed Python modules.
 
@@ -112,7 +114,8 @@ def upgrade_modules(simulate=False, json_output=False):
             print(f"{'Module':<30} {'Old Version':<15} {'New Version':<15}")
             print("="*60)
             for package in outdated_packages:
-                print(f"{package['name']:<30} {package['version']:<15} {package['latest_version']:<15}")
+                print(f"{package['name']:<30} {package['version']:<15} "
+                      f"{package['latest_version']:<15}")
     else:
         # If not in simulation mode, proceed with the upgrade.
         package_names = [pkg['name'] for pkg in outdated_packages]
@@ -120,10 +123,11 @@ def upgrade_modules(simulate=False, json_output=False):
 
         # Construct the 'pip install --upgrade' command.
         command = [sys.executable, '-m', 'pip', 'install', '--upgrade'] + package_names
-        
+
         try:
             # Use Popen to stream the output of the upgrade process in real-time.
-            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True) as proc:
+            with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True) as proc:
                 if proc.stdout:
                     for line in proc.stdout:
                         print(line, end='')
@@ -132,7 +136,8 @@ def upgrade_modules(simulate=False, json_output=False):
                 # Check for errors after the process has finished.
                 if proc.returncode != 0 and proc.stderr:
                     stderr_output = "".join(proc.stderr.readlines())
-                    raise subprocess.CalledProcessError(proc.returncode, command, stderr=stderr_output)
+                    raise subprocess.CalledProcessError(proc.returncode, command,
+                                                        stderr=stderr_output)
 
             print("\nSuccessfully upgraded all packages.")
         except subprocess.CalledProcessError as e:
@@ -148,7 +153,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="A tool to list and upgrade Python modules."
     )
-    
+
     # Create a mutually exclusive group for --list and --upgrade, as they cannot be used together.
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument(
@@ -161,7 +166,7 @@ def main():
         action='store_true',
         help="Upgrade all installed packages."
     )
-    
+
     # Add optional arguments that can be used with the main commands.
     parser.add_argument(
         '--simulate',
@@ -173,14 +178,14 @@ def main():
         action='store_true',
         help='Output the results in JSON format (works with --list or --upgrade --simulate).'
     )
-    
+
     # If the script is run without arguments, print the help message.
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
-        
+
     args = parser.parse_args()
-    
+
     # Call the appropriate function based on the parsed arguments.
     if args.list:
         list_all_packages(json_output=args.json)
