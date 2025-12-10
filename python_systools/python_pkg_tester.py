@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ----------------------------------------------
-# python_module_tester.py
+# python_pkg_tester.py
 # v1.0.1xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 

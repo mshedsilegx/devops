@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ----------------------------------------------
-# python_package_info.py
+# python_pkg_info.py
 # v1.0.0xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 #
@@ -20,6 +20,9 @@ Core Functionality:
        available version of the package, helping identify outdated dependencies.
     4. Output Flexibility: Provides both human-readable text output (with multiple
        verbosity levels) and a machine-parseable JSON format for automation.
+    5. Shared Logic:
+       - Relies on `python_pkg_utils.py` for robust path resolution and common
+         helper functions, ensuring consistency with `python_pkg_upgrader.py`.
 """
 
 import argparse
@@ -50,7 +53,16 @@ def display_results(metadata: dict, json_output: bool, quiet_mode: bool, verbose
         
     # Handle JSON output.
     if json_output:
-        print(json.dumps(metadata, indent=4))
+        if not verbose_mode:
+            standard_keys = [
+                "package_name", "import_name", "exact_path",
+                "current_version", "latest_version", "module_type"
+            ]
+            output_data = {k: metadata[k] for k in standard_keys if k in metadata}
+        else:
+            output_data = metadata
+            
+        print(json.dumps(output_data, indent=4))
     else:
         # Handle human-readable text output.
         

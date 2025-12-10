@@ -1,8 +1,8 @@
-# Python Module Parser (`python_module_parser.py`)
+# Python Package Parser (`python_pkg_parser.py`)
 
 ## 1. Application Overview and Objectives
 
-The `python_module_parser.py` script is a command-line utility designed to analyze a directory of Python source code and identify all its external (third-party) dependencies. Its primary objective is to provide a clear and accurate list of non-standard-library modules that a project relies on.
+The `python_pkg_parser.py` script is a command-line utility designed to analyze a directory of Python source code and identify all its external (third-party) dependencies. Its primary objective is to provide a clear and accurate list of non-standard-library modules that a project relies on.
 
 This tool is particularly useful for:
 - **Dependency Auditing:** Quickly understanding all third-party libraries used in a project.

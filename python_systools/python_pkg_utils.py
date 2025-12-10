@@ -1,6 +1,8 @@
-# python_pkg_utils.py
-# Shared utility functions for Python system tools
 # ----------------------------------------------
+# python_pkg_utils.py
+# v1.0.0xg  2025/12/08  XdG / MIS Center
+# ----------------------------------------------
+# Overview: Shared utility functions for Python system tools
 
 import importlib.metadata
 import importlib.util

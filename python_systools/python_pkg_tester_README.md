@@ -1,8 +1,8 @@
-# Python Module Tester
+# Python Package Tester (`python_pkg_tester.py`)
 
 ## 1. Application Overview and Objectives
 
-The **Python Module Tester** is a command-line utility designed to perform a comprehensive "health check" on any installed Python module. Its primary objective is to provide developers and system administrators with a quick, detailed, and consistent way to assess a module's quality, structure, and basic performance characteristics without needing to dive deep into its source code.
+The **Python Package Tester** is a command-line utility designed to perform a comprehensive "health check" on any installed Python module. Its primary objective is to provide developers and system administrators with a quick, detailed, and consistent way to assess a module's quality, structure, and basic performance characteristics without needing to dive deep into its source code.
 
 The script runs a suite of 13 generic soundness checks, a performance test, and an environment check to generate a structured report covering:
 -   Code structure and best practices (docstrings, versioning, API definition).

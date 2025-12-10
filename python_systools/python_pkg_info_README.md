@@ -1,8 +1,8 @@
-# Python Package Inspector
+# Python Package Inspector (`python_pkg_info.py`)
 
 ## 1. Application Overview and Objectives
 
-The `python_package_info.py` script is a command-line utility designed to provide detailed, accurate, and reliable information about installed Python packages. Its primary objective is to resolve the exact on-disk installation path of a Python module, which can often be ambiguous, and to gather comprehensive metadata related to it.
+The `python_pkg_info.py` script is a command-line utility designed to provide detailed, accurate, and reliable information about installed Python packages. Its primary objective is to resolve the exact on-disk installation path of a Python module, which can often be ambiguous, and to gather comprehensive metadata related to it.
 
 This tool is essential for developers, system administrators, and automated scripts that need to:
 - **Verify Package Installations:** Confirm that a package is installed and determine its exact location.
@@ -58,7 +58,7 @@ To get the primary information for a package like `numpy`.
 
 **Command:**
 ```sh
-python3 python_package_info.py --package numpy
+python3 python_pkg_info.py --package numpy
 ```
 
 **Example Output:**
@@ -80,7 +80,7 @@ To see all available metadata, including dependencies and licensing, for the `re
 
 **Command:**
 ```sh
-python3 python_package_info.py --package requests --verbose
+python3 python_pkg_info.py --package requests --verbose
 ```
 **Example Output:**
 ```
@@ -113,7 +113,7 @@ To get the output in a machine-readable JSON format. This is ideal for use in ot
 
 **Command:**
 ```sh
-python3 python_package_info.py --package cffi --json
+python3 python_pkg_info.py --package cffi --json
 ```
 
 **Example JSON Output:**
@@ -141,7 +141,7 @@ For a minimal, clean output that is easy to parse in a shell script.
 
 **Command:**
 ```sh
-python3 python_package_info.py --package urllib3 --quiet
+python3 python_pkg_info.py --package urllib3 --quiet
 ```
 
 **Example Output:**
@@ -159,7 +159,7 @@ If a package path is not being resolved as expected, the `--debug` flag provides
 
 **Command:**
 ```sh
-python3 python_package_info.py --package snowflake-connector-python --debug
+python3 python_pkg_info.py --package snowflake-connector-python --debug
 ```
 **Example Debug Output:**
 ```

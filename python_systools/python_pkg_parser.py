@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ----------------------------------------------
-# python_module_parser.py
+# python_pkg_parser.py
 # v1.0.2xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
 # Requirements: Python 3.10 or newer.

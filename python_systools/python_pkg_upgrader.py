@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # ----------------------------------------------
-# python_module_upgrade.py
+# python_pkg_upgrader.py
 # v1.1.0xg  2025/12/09  XdG / MIS Center
 # ----------------------------------------------
 #
@@ -24,7 +24,7 @@ Core Functionality:
 
     3. Shared Logic:
        - Relies on `python_pkg_utils.py` for robust path resolution and common
-         helper functions, ensuring consistency with `python_package_info.py`.
+         helper functions, ensuring consistency with `python_pkg_info.py`.
 """
 
 import argparse
