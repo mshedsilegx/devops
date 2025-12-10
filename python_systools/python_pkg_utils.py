@@ -2,7 +2,21 @@
 # python_pkg_utils.py
 # v1.0.0xg  2025/12/08  XdG / MIS Center
 # ----------------------------------------------
-# Overview: Shared utility functions for Python system tools
+# Overview:
+# This module provides a centralized set of utility functions for Python package analysis and metadata
+# resolution. It serves as a shared backend for various Python system tools, abstracting the complexities
+# of package introspection. Key functionalities include resolving package installation paths,
+# categorizing package locations (system, user, custom), determining module types (pure Python vs.
+# compiled), and fetching the latest version from PyPI.
+#
+# Core Design Principles:
+# 1. Reliability: Uses the standard `importlib.metadata` library for robust metadata access and
+#    employs a multi-step heuristic to reliably determine a package's on-disk location.
+# 2. Modularity: Consolidates shared logic to avoid code duplication across different tools.
+# 3. Graceful Degradation: Includes a dummy `requests` class to prevent crashes if the library
+#    is not installed, allowing network-dependent functions to fail gracefully.
+# 4. Python Version Guard: Explicitly checks for the minimum required Python version (3.8+)
+#    to ensure compatibility with `importlib.metadata`.
 
 import importlib.metadata
 import importlib.util
@@ -12,18 +26,24 @@ from pathlib import Path
 import json
 import site
 
-# Define a dummy class for when requests is not installed.
+# Define a dummy class to gracefully handle the absence of the 'requests' library.
+# This prevents the entire script from failing if 'requests' is not installed,
+# allowing other non-network functionalities to proceed.
 class DummyRequests:
+    """A dummy class that mimics the `requests` library's interface for PyPI lookups."""
     @staticmethod
     def get(url, timeout):
+        """Simulates a failed GET request, returning a 503 status code."""
         class DummyResponse:
-            status_code = 503
+            status_code = 503  # Service Unavailable
             @staticmethod
             def json():
+                """Returns a JSON object indicating the error."""
                 return {'info': {'version': 'Error: requests not installed'}}
         return DummyResponse()
 
-# Third-Party Imports
+# Attempt to import the 'requests' library for network operations. If it fails,
+# substitute it with the DummyRequests class to ensure the script remains operational.
 try:
     import requests
 except ImportError:
@@ -33,17 +53,23 @@ except ImportError:
 # CONFIGURATION CONSTANTS
 # ====================================================================
 
-# Minimum required Python version tuple (3.8 is the minimum for importlib.metadata)
+# The minimum required Python version (3.8) is necessary because `importlib.metadata`
+# was introduced as a standard library module in that version.
 MIN_PYTHON_VERSION_TUPLE = (3, 8)
 
-# Base URL for the PyPI JSON API lookup
+# The official PyPI JSON API endpoint for fetching package metadata.
 PYPI_JSON_URL = "https://pypi.org/pypi/{package_name}/json"
 
-# Module-level debug flag
+# A global flag to enable or disable verbose debugging output for troubleshooting.
 DEBUG_MODE = False
 
 def set_debug_mode(enabled: bool):
-    """Sets the debug mode for the utility module."""
+    """
+    Globally sets the debug mode for this module.
+
+    Args:
+        enabled (bool): True to enable debug prints, False to disable.
+    """
     global DEBUG_MODE
     DEBUG_MODE = enabled
 
@@ -53,7 +79,19 @@ def set_debug_mode(enabled: bool):
 
 def get_package_location_category(install_path):
     """
-    Determines if a package is user, system, or custom.
+    Categorizes a package's installation path into 'user', 'system', or 'custom'.
+
+    This function determines the nature of a package's installation location by checking
+    it against standard Python and environment-defined paths in a specific order of precedence:
+    1. Custom paths (MODULEPATH, PYTHONPATH)
+    2. User-specific site-packages
+    3. System-level or virtual environment site-packages
+
+    Args:
+        install_path (str): The absolute path to the package's installation directory.
+
+    Returns:
+        str: The category of the location ('custom', 'user', 'system', or 'unknown').
     """
     if not install_path or not os.path.exists(install_path):
         return "unknown"
@@ -111,7 +149,14 @@ def get_package_location_category(install_path):
 def get_latest_version_from_pypi(package_name: str) -> str:
     """
     Fetches the latest published version of a package from the PyPI JSON API.
+
+    Args:
+        package_name (str): The name of the package as it appears on PyPI.
+
+    Returns:
+        str: The latest version number as a string, or an error message if the lookup fails.
     """
+    # Return an error immediately if the `requests` library is not available.
     if isinstance(requests, DummyRequests):
         return "Error: requests library not found for network lookup"
 
@@ -134,7 +179,16 @@ def get_latest_version_from_pypi(package_name: str) -> str:
 
 def get_module_type(dist: importlib.metadata.Distribution) -> str:
     """
-    Determines if a package is purelib or platlib by checking for compiled files.
+    Determines if a package is 'purelib' (pure Python) or 'platlib' (contains compiled binaries).
+
+    This function inspects the file list of an installed package for common compiled file extensions
+    (e.g., .so, .pyd) to differentiate between pure Python and platform-specific distributions.
+
+    Args:
+        dist (importlib.metadata.Distribution): The distribution object for the package.
+
+    Returns:
+        str: A string indicating the module type, e.g., "purelib" or "platlib".
     """
     compiled_extensions = ('.so', '.pyd', '.dll', '.dylib')
     
@@ -149,7 +203,18 @@ def get_module_type(dist: importlib.metadata.Distribution) -> str:
 
 def resolve_package_metadata(package_name: str) -> dict:
     """
-    Resolves all package properties, including path and versions, using definitive file-based logic.
+    Resolves a comprehensive set of metadata for a given installed package.
+
+    This is the core function of the utility module. It orchestrates multiple steps to gather
+    detailed information about a package, including its version, path, type, and dependencies.
+    The path resolution logic is particularly robust, using a multi-layered approach to
+    reliably find the package's location on disk.
+
+    Args:
+        package_name (str): The name of the package to resolve.
+
+    Returns:
+        dict: A dictionary containing detailed metadata, or an error dictionary if the package is not found.
     """
     global DEBUG_MODE
     
