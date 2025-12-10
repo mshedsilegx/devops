@@ -15,7 +15,7 @@ Core Functionality:
        - Scans all installed packages.
        - Uses the shared `python_pkg_utils` to resolve the exact on-disk location,
          version, and module type (pure Python vs. compiled extension).
-       - Classifies packages as 'system', 'local', or 'custom' based on path.
+       - Classifies packages as 'system', 'user', or 'custom' based on path.
 
     2. Bulk Upgrade (--upgrade):
        - Identifies outdated packages using `pip list --outdated`.
@@ -32,7 +32,7 @@ import sys
 import json
 import subprocess
 import importlib.metadata
-from python_pkg_utils import resolve_package_metadata, set_debug_mode
+from python_pkg_utils import resolve_package_metadata
 
 def list_all_packages():
     """
@@ -131,20 +131,11 @@ def main():
         help='Specify a target directory for module upgrades.'
     )
     
-    parser.add_argument(
-        '--debug',
-        action='store_true',
-        help='Display detailed path resolution debugging information.'
-    )
-    
     if len(sys.argv) == 1:
         parser.print_help(sys.stderr)
         sys.exit(1)
         
     args = parser.parse_args()
-    
-    # Set the global debug flag based on user input
-    set_debug_mode(args.debug)
     
     if args.list:
         list_all_packages()

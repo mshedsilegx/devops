@@ -51,25 +51,31 @@ def set_debug_mode(enabled: bool):
 
 def get_package_location_category(install_path):
     """
-    Determines if a package is local, system, or custom.
+    Determines if a package is user, system, or custom.
     """
     if not install_path or not os.path.exists(install_path):
         return "unknown"
         
     real_install_path = os.path.realpath(install_path)
-    home_dir = os.path.expanduser('~')
+    
+    # 1. Custom: Check MODULEPATH
+    module_path_env = os.environ.get('MODULEPATH')
+    if module_path_env:
+        for path in module_path_env.split(os.pathsep):
+            if path and real_install_path.startswith(os.path.realpath(path)):
+                return "custom"
 
-    # 1. If inside the user's home directory, it's 'local'.
-    if real_install_path.startswith(home_dir):
-        return "local"
-
-    # 2. If in a system-wide site-packages directory, it's 'system'.
+    # 2. System: Check system-wide site-packages
     for path in site.getsitepackages():
         if real_install_path.startswith(os.path.realpath(path)):
             return "system"
 
-    # 3. Otherwise, it's 'custom'.
-    return "custom"
+    # 3. User: Check user's home directory (e.g. ~/.local)
+    home_dir = os.path.expanduser('~')
+    if real_install_path.startswith(home_dir):
+        return "user"
+
+    return "unknown"
 
 def get_latest_version_from_pypi(package_name: str) -> str:
     """
@@ -211,7 +217,7 @@ def resolve_package_metadata(package_name: str) -> dict:
     # --- 5. Gather Remaining Metadata ---
     latest_version = get_latest_version_from_pypi(package_name)
     module_type = get_module_type(dist)
-    location_category = get_package_location_category(dist_root)
+    location_category = get_package_location_category(resolved_path)
     
     requires_dist = metadata_dict.get('Requires-Dist')
     
