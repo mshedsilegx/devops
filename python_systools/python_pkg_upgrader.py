@@ -88,13 +88,14 @@ def get_outdated_packages():
         print(f"Error checking for outdated packages: {e}", file=sys.stderr)
         return []
 
-def upgrade_modules(simulate=False, json_output=False):  # pylint: disable=too-many-branches
+def upgrade_modules(simulate=False, json_output=False, target_path=None):  # pylint: disable=too-many-branches
     """
     Upgrades all installed Python modules.
 
     Args:
         simulate (bool): If True, lists the packages to be upgraded without performing the upgrade.
         json_output (bool): If True and in simulation mode, prints the output in JSON format.
+        target_path (str): Optional. Specifies the target directory for installation.
     """
     outdated_packages = get_outdated_packages()
 
@@ -122,7 +123,12 @@ def upgrade_modules(simulate=False, json_output=False):  # pylint: disable=too-m
         print(f"Upgrading {len(package_names)} packages...")
 
         # Construct the 'pip install --upgrade' command.
-        command = [sys.executable, '-m', 'pip', 'install', '--upgrade'] + package_names
+        command = [sys.executable, '-m', 'pip', 'install', '--upgrade']
+
+        if target_path:
+            command.extend(['--target', target_path])
+
+        command.extend(package_names)
 
         try:
             # Use Popen to stream the output of the upgrade process in real-time.
@@ -178,6 +184,10 @@ def main():
         action='store_true',
         help='Output the results in JSON format (works with --list or --upgrade --simulate).'
     )
+    parser.add_argument(
+        '--target',
+        help='Specify a target directory for the upgrade installation (works with --upgrade).'
+    )
 
     # If the script is run without arguments, print the help message.
     if len(sys.argv) == 1:
@@ -190,7 +200,7 @@ def main():
     if args.list:
         list_all_packages(json_output=args.json)
     elif args.upgrade:
-        upgrade_modules(simulate=args.simulate, json_output=args.json)
+        upgrade_modules(simulate=args.simulate, json_output=args.json, target_path=args.target)
 
 if __name__ == "__main__":
     # This block ensures the main function is called only when the script is executed directly.

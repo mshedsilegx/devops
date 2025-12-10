@@ -24,8 +24,20 @@ The script is designed with the following principles in mind:
 | --- | --- | --- | --- |
 | `--list` | Lists all installed Python packages with detailed metadata. | Flag | N/A |
 | `--upgrade` | Upgrades all outdated Python packages. | Flag | N/A |
-| `--simulate` | When used with `--upgrade`, it shows which packages would be upgraded without making any changes. | Flag | N/A |
-| `--json` | Outputs the result in JSON format. This can be used with `--list` or with `--upgrade --simulate`. | Flag | N/A |
+| `--simulate` | Simulates the upgrade process without making changes. Only works with `--upgrade`. | Flag | N/A |
+| `--json` | Outputs the results in JSON format. Works with `--list` or `--upgrade --simulate`. | Flag | N/A |
+| `--target <path>` | Specifies a custom installation directory for upgrades. Useful for environments with split library paths. Only works with `--upgrade`. | String | None |
+
+## Handling Custom Environments
+
+In environments where packages are split across multiple directories (e.g., a custom `PYTHONPATH` that takes precedence over standard `site-packages`), standard `pip install --upgrade` might install the new version into the default location, leaving the old version active in the custom path (package shadowing).
+
+To prevent this, use the `--target` flag to force the upgrade into the correct directory:
+
+```bash
+# Force upgrades into the custom module directory
+python python_pkg_upgrader.py --upgrade --target /u01/apps/python314/lib/modules3.14
+```
 
 **Note**: `--list` and `--upgrade` are mutually exclusive.
 
