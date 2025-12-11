@@ -182,7 +182,7 @@ class SystemDiagnostics:
         for name, key in limit_names.items():
             try:
                 rlimit_id = getattr(resource, name)
-                soft, hard = resource.getrlimit(rlimit_id)
+                soft, hard = resource.getrlimit(rlimit_id)  # type: ignore
 
                 if 'gb' in key:
                     soft = f"{soft / (1024**3):.2f}" if soft != -1 else "Unlimited"

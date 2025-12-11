@@ -130,7 +130,7 @@ def remove_old_package_from_target(package_name, target_path):
             dist_info_file = next((f for f in files if '.dist-info' in str(f)
                                    or '.egg-info' in str(f)), None)
             if dist_info_file:
-                full_path = dist.locate_file(dist_info_file)
+                full_path = str(dist.locate_file(dist_info_file))
                 # Walk up to the .dist-info directory
                 path_obj = Path(full_path)
                 while path_obj.name and not (path_obj.name.endswith('.dist-info')

@@ -270,8 +270,8 @@ def resolve_package_metadata(package_name: str) -> dict:  # pylint: disable=too-
                 for f in dist.files
                 if str(f).endswith('.dist-info') or str(f).endswith('.egg-info')
             ][0]
-            dist_root = str(Path(os.path.abspath(dist.locate_file(
-                Path(dist_info_folder_name)))).parent)
+            dist_root = str(Path(os.path.abspath(str(dist.locate_file(
+                Path(dist_info_folder_name))))).parent)
     except Exception:  # pylint: disable=broad-exception-caught
         dist_root = "Could not determine root via files."
 
@@ -309,8 +309,8 @@ def resolve_package_metadata(package_name: str) -> dict:  # pylint: disable=too-
     # --- 4a. Path Resolution Final Fallback ---
     if resolved_path == "Could not determine root via files.":
         try:
-            potential_root_path = str(Path(os.path.abspath(dist.locate_file(
-                Path(top_level_module)))).parent)
+            potential_root_path = str(Path(os.path.abspath(str(dist.locate_file(
+                Path(top_level_module))))).parent)
             if Path(potential_root_path).is_dir():
                 resolved_path = potential_root_path
         except Exception as e:  # pylint: disable=broad-exception-caught

@@ -240,6 +240,8 @@ def fixline(line):
         return line
 
     flags = populate_flags(line)
+    if NEW_INTERPRETER is None:
+        return line
     return b'#! ' + NEW_INTERPRETER + flags + b'\n'
 
 
