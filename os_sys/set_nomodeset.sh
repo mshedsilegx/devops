@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ----------------------------------------------
 # set_nomodeset.sh
-# v1.0.0xg  2025/12/09  XdG / MIS Center
+# v1.0.1xg  2025/12/15  XdG / MIS Center
 # ----------------------------------------------
 # Overview: 
 #   Ensures 'nomodeset' is set correctly in GRUB for headless servers.
@@ -76,6 +76,7 @@ apply_nomodeset() {
     # 1. Ensure Idempotency: 
     #    Remove any existing 'nomodeset' occurrences to prevent duplicates (e.g., "nomodeset nomodeset").
     #    Regex matches word boundary \bnomodeset\b with optional surrounding whitespace.
+	cp -af "$GRUB_CONFIG_FILE" "$GRUB_CONFIG_FILE.$(date '+%Y%m%d-%H%M%S')"
     sed -i 's/\s*\bnomodeset\b\s*//g' "$GRUB_CONFIG_FILE"
     check_error "Failed to remove previous 'nomodeset' entries."
 
@@ -84,7 +85,7 @@ apply_nomodeset() {
     #    Target line: Begins with GRUB_CMDLINE_LINUX=
     #    Substitution: Replaces the first equals sign and quote (=") with (="nomodeset ).
     #    Note: This assumes the value is quoted (standard in most distributions).
-    sed -i '/^GRUB_CMDLINE_LINUX=/s/="="nomodeset /' "$GRUB_CONFIG_FILE"
+    sed -i '/^GRUB_CMDLINE_LINUX=/s|="|="nomodeset |' "$GRUB_CONFIG_FILE"
     check_error "Failed to insert 'nomodeset' into GRUB_CMDLINE_LINUX."
     
     echo "Inserted 'nomodeset' into GRUB_CMDLINE_LINUX."
