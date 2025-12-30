@@ -1,0 +1,421 @@
+#!/bin/bash
+# -------------------------------------
+#  $HOME/scripts/git_autosync.sh
+#  v2.7.0xg  2025/12/30  XDG
+# -------------------------------------
+# Syntax: ./git_autosync.sh --base-folder=<base_folder> [options]
+# Options: [--detect-only|--message="<msg>"|--verbose|--parallel=N,T]
+# Prereqs: git
+
+# Summary of Global Configs for a Clean Workflow
+# ------------------------------------------+-------------------------------------------------------------------------------
+#               Command                     |                                  What it does
+# ------------------------------------------+-------------------------------------------------------------------------------
+# git config --global pull.rebase true      | Makes rebase the default for every pull
+# git config --global rebase.autoStash true | Automatically handles dirty working trees during rebase
+# git config --global fetch.prune true      | Automatically removes local "ghost" branches that were deleted on the server
+# ------------------------------------------+-------------------------------------------------------------------------------
+
+# --- Default values ---
+# BASE_DEV_DIR: The root directory to start searching for git repositories.
+# DETECT_ONLY: If true, only reports changes without committing or pushing.
+# CUSTOM_COMMIT_MSG: User-provided commit message (via --message).
+# VERBOSE: If true, prints extra separators for better readability.
+# PARALLEL_JOBS: Max number of background processes (default 1).
+# PARALLEL_DELAY: Sleep timer before starting another background process (default 0).
+BASE_DEV_DIR=""
+DETECT_ONLY=false
+CUSTOM_COMMIT_MSG=""
+VERBOSE=false
+PARALLEL_JOBS=1
+PARALLEL_DELAY=0
+
+# Detect number of processors for parallel default
+if command -v nproc &>/dev/null; then
+  NPROC=$(nproc)
+elif [[ -n "$NUMBER_OF_PROCESSORS" ]]; then
+  NPROC="$NUMBER_OF_PROCESSORS"
+elif command -v sysctl &>/dev/null; then
+  NPROC=$(sysctl -n hw.ncpu 2>/dev/null || echo 1)
+else
+  NPROC=1
+fi
+
+# --- Usage ---
+# Displays script syntax and available options, then exits.
+# Arguments: $1 = exit code (optional, default 1)
+usage() {
+  local exit_code="${1:-1}"
+  echo "Usage: $0 --base-folder=<path> [options]"
+  echo ""
+  echo "Mandatory:"
+  echo "  --base-folder=<path>  Base directory to search for git repos"
+  echo ""
+  echo "Options:"
+  echo "  --detect-only         Only show changes, do not commit or push"
+  echo "  --message=\"<msg>\"     Custom commit message"
+  echo "  --verbose             Show more output"
+  echo "  --parallel[=N,T]      Enable parallel sync (N=processes, T=delay in sec)"
+  echo "                        N defaults to $NPROC cores, T defaults to 0s"
+  echo "  --help                Show this help message"
+  exit "$exit_code"
+}
+
+# --- Parsing Arguments ---
+# Iterates through command-line arguments to set configuration.
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --base-folder=*)
+      BASE_DEV_DIR="${1#*=}"
+      shift
+    ;;
+    --detect-only)
+      DETECT_ONLY=true
+      shift
+    ;;
+    --message=*)
+      CUSTOM_COMMIT_MSG="${1#*=}"
+      shift
+    ;;
+    --verbose)
+      VERBOSE=true
+      shift
+    ;;
+    --parallel)
+      PARALLEL_JOBS="$NPROC"
+      shift
+    ;;
+    --parallel=*)
+      val="${1#*=}"
+      if [[ -z "$val" ]]; then
+        PARALLEL_JOBS="$NPROC"
+      elif [[ $val =~ ^([0-9]+),([0-9]+)$ ]]; then
+        PARALLEL_JOBS="${BASH_REMATCH[1]}"
+        PARALLEL_DELAY="${BASH_REMATCH[2]}"
+      elif [[ $val =~ ^[0-9]+$ ]]; then
+        PARALLEL_JOBS="$val"
+      else
+        echo "Error: Invalid parallel format. Use --parallel=N or --parallel=N,T"
+        exit 1
+      fi
+      
+      # Safety validation: ensure at least 1 job
+      if [ "$PARALLEL_JOBS" -lt 1 ]; then
+        echo "Error: --parallel must specify at least 1 process."
+        exit 1
+      fi
+      shift
+    ;;
+    --help)
+      usage 0
+    ;;
+    *)
+      echo "Unknown option: $1"
+      usage
+    ;;
+  esac
+done
+
+# Ensure Git operations are non-interactive to prevent hangs in automation
+export GIT_TERMINAL_PROMPT=0
+export GIT_SSH_COMMAND="ssh -o BatchMode=yes"
+
+# --- Validation ---
+# Ensure required parameters are provided and environment is ready.
+if [[ -z "$BASE_DEV_DIR" ]]; then
+  echo "Error: --base-folder is required."
+  usage
+fi
+
+# Create a temporary directory for tracking results in parallel mode
+# This allows background processes to communicate their status to the parent.
+if ! TMP_RESULTS_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'git_autosync'); then
+  echo "Error: Failed to create temporary directory."
+  exit 5
+fi
+
+# Cleanup function to be called on exit or interruption
+cleanup() {
+  local exit_code=$?
+  # Kill any remaining background jobs if we're interrupted
+  if [[ $exit_code -ne 0 ]]; then
+    local pids
+    pids=$(jobs -p)
+    if [[ -n "$pids" ]]; then
+      echo -e "\n[!] Interrupted. Cleaning up background jobs..."
+      # Use kill -TERM (15) for graceful exit, then wait slightly and KILL if needed
+      kill -TERM $pids 2>/dev/null
+      (sleep 1; kill -KILL $pids 2>/dev/null) &
+    fi
+  fi
+  [[ -d "$TMP_RESULTS_DIR" ]] && rm -rf "$TMP_RESULTS_DIR"
+  exit $exit_code
+}
+
+trap cleanup EXIT SIGINT SIGTERM
+
+# --- Sync Function ---
+# Performs the sequential sync logic for a single repository.
+# Arguments: $1 = project path, $2 = project index
+sync_repo() {
+  local proj_dir="$1"
+  local index="$2"
+  local log_file="$TMP_RESULTS_DIR/log_$index"
+  local status_file="$TMP_RESULTS_DIR/status_$index"
+  local msg branch outcome pull_output push_output status_output action_taken head_before head_after pull_exit push_exit
+
+  # Initialize status as unknown in case of crash
+  echo "unknown" > "$status_file"
+  action_taken=false
+
+  # Redirect all output for this project to a log file to avoid interleaving
+  {
+    echo "[$index] Syncing: $proj_dir"
+    
+    # Move into the project directory
+    if ! pushd "$proj_dir" &> /dev/null; then
+      echo "  [X] Failed to enter directory"
+      echo "fail" > "$status_file"
+      return
+    fi
+
+    # Capture state before operations (MUST be after pushd)
+    head_before=$(git rev-parse HEAD 2>/dev/null || echo "empty")
+
+    # Check if we have a remote named origin
+    if ! git remote | grep -q "^origin$"; then
+      echo "  [.] No 'origin' remote found. Skipping sync."
+      echo "skip" > "$status_file"
+      popd &> /dev/null
+      return
+    fi
+
+    # 1. Handle local changes (Stage and Commit)
+    if [[ -n "$(git status --porcelain)" ]]; then
+      if [[ "$DETECT_ONLY" == true ]]; then
+        echo "  [!] Local changes detected (Skipping commit in detect-only mode)."
+        echo "found" > "$status_file"
+      else
+        echo "  [!] Local changes detected. Committing..."
+
+        # Determine commit message
+        if [[ -n "$CUSTOM_COMMIT_MSG" ]]; then
+          msg="$CUSTOM_COMMIT_MSG"
+        else
+          msg="Auto-sync: $(date +'%Y-%m-%d %H:%M:%S')"
+        fi
+
+        # Stage all changes and commit
+        git add -A
+        if ! git commit -m "$msg"; then
+          echo "  [X] Error: Commit failed."
+          echo "fail" > "$status_file"
+          popd &> /dev/null
+          return
+        fi
+        action_taken=true
+      fi
+    fi
+
+    # 2. Sync with remote (Pull and Push)
+    # This block executes even if there were no local changes to commit,
+    # ensuring that we pull remote updates and push existing local commits.
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    if [[ -z "$branch" ]]; then
+      echo "  [X] Error: Could not detect current branch."
+      echo "fail" > "$status_file"
+      popd &> /dev/null
+      return
+    fi
+
+    if [[ "$DETECT_ONLY" == true ]]; then
+      # In detect-only mode, we check if we are ahead/behind without pulling/pushing
+      if [[ "$branch" != "HEAD" ]]; then
+        status_output=$(git status -uno 2>/dev/null)
+        if echo "$status_output" | grep -q "Your branch is ahead"; then
+          echo "  [!] Branch is ahead of remote."
+          echo "found" > "$status_file"
+        fi
+        if echo "$status_output" | grep -q "Your branch is behind"; then
+          echo "  [!] Branch is behind remote."
+          echo "found" > "$status_file"
+        fi
+      fi
+      # If nothing was found yet, mark as skip
+      if grep -q "unknown" "$status_file"; then
+        echo "skip" > "$status_file"
+      fi
+    else
+      # Safety check for detached HEAD state
+      if [[ "$branch" == "HEAD" ]]; then
+        echo "  [X] Error: Detached HEAD detected. Skipping network sync."
+        echo "fail" > "$status_file"
+        popd &> /dev/null
+        return
+      fi
+
+      # Check if an upstream tracking branch is set
+      if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} &> /dev/null; then
+        echo "  [!] No upstream branch set. Attempting to set origin/$branch..."
+        # Only try to set upstream if the remote branch actually exists
+        if git ls-remote --exit-code --heads origin "$branch" &> /dev/null; then
+          git branch --set-upstream-to="origin/$branch" "$branch" &> /dev/null
+        else
+          echo "  [?] Remote branch origin/$branch does not exist yet."
+        fi
+      fi
+
+      # Pull remote changes using rebase
+      pull_output=$(git pull --rebase origin "$branch" 2>&1)
+      pull_exit=$?
+      
+      # In verbose mode, show the pull output
+      if [[ "$VERBOSE" == true ]]; then
+        echo "$pull_output" | sed 's/^/      /'
+      fi
+
+      # Check for conflicts immediately after pull
+      if [[ $pull_exit -ne 0 ]]; then
+        if [[ -d ".git/rebase-merge" || -d ".git/rebase-apply" ]]; then
+          echo "  [X] Error: Conflict detected during pull --rebase. Aborting..."
+          git rebase --abort &> /dev/null
+          echo "fail" > "$status_file"
+          popd &> /dev/null
+          return
+        fi
+        echo "  [?] Note: Pull failed or branch doesn't exist on origin yet."
+      fi
+
+      # Push local changes to remote
+      push_output=$(git push origin "$branch" 2>&1)
+      push_exit=$?
+
+      # In verbose mode, show the push output
+      if [[ "$VERBOSE" == true ]]; then
+        echo "$push_output" | sed 's/^/      /'
+      fi
+
+      # Check if HEAD moved (meaning pull changed something or commit was made)
+      head_after=$(git rev-parse HEAD 2>/dev/null || echo "empty")
+      if [[ "$head_before" != "$head_after" ]]; then
+        action_taken=true
+      fi
+
+      if [[ $push_exit -eq 0 ]]; then
+        # If push output doesn't contain 'up-to-date', then we pushed something
+        if [[ ! "$push_output" =~ "Everything up-to-date" ]]; then
+          action_taken=true
+        fi
+        
+        if [[ "$action_taken" == true ]]; then
+          echo "  [+] Successfully synced $branch."
+          echo "success" > "$status_file"
+        else
+          echo "  [.] Already up to date."
+          echo "skip" > "$status_file"
+        fi
+      else
+        echo "  [X] Error: Push failed for $proj_dir. Check for conflicts or permissions."
+        echo "$push_output" | sed 's/^/      /'
+        echo "fail" > "$status_file"
+      fi
+    fi
+
+    popd &> /dev/null
+    [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
+  } > "$log_file" 2>&1
+
+  # Output the captured log to the terminal in one block if verbose 
+  # or if something core actually happened (action taken, error, or detection).
+  outcome=$(cat "$status_file" 2>/dev/null)
+  if [[ "$VERBOSE" == true || "$outcome" == "success" || "$outcome" == "fail" || "$outcome" == "found" ]]; then
+    cat "$log_file"
+  fi
+}
+
+# Check if git is installed
+if ! command -v git &> /dev/null; then
+  echo "Error: git is not installed or not in PATH."
+  exit 4
+fi
+
+if [[ "$VERBOSE" == true ]]; then
+  if [[ "$DETECT_ONLY" == true ]]; then
+    echo "Mode: Detection only (no commits or pushes will be made)."
+  else
+    echo "Mode: Full sync enabled."
+  fi
+
+  if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
+    echo "Execution: Parallel mode ($PARALLEL_JOBS processes, delay ${PARALLEL_DELAY}s)."
+  else
+    echo "Execution: Sequential mode."
+  fi
+fi
+
+# Check the directory exists and show start header
+if [[ ! -d "$BASE_DEV_DIR" ]]; then
+  echo "Error: $BASE_DEV_DIR is not a directory."
+  exit 3
+fi
+
+if [[ "$VERBOSE" == true ]]; then
+  echo "Starting recursive sync in: $BASE_DEV_DIR"
+  echo "------------------------------------------"
+fi
+
+# Counters for final summary report
+TOTAL_REPOS=0
+SYNCED_REPOS=0
+FAILED_REPOS=0
+SKIPPED_REPOS=0
+
+# Find all directories/files named .git (to support submodules and worktrees)
+# Logic for parallel or sequential execution
+while IFS= read -r -d '' git_item; do
+  ((TOTAL_REPOS++))
+  proj_dir=$(dirname "$git_item")
+  
+  # Run sync_repo
+  if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
+    [[ "$VERBOSE" == true ]] && echo "[$TOTAL_REPOS] Starting: $proj_dir"
+    # Background the process
+    sync_repo "$proj_dir" "$TOTAL_REPOS" &
+    
+    # Sleep if requested
+    if [[ "$PARALLEL_DELAY" -gt 0 ]]; then
+      sleep "$PARALLEL_DELAY"
+    fi
+    
+    # Job management: ensure we don't exceed PARALLEL_JOBS
+    # We use jobs -p to count active background tasks
+    while [[ "$(jobs -p | wc -l)" -ge "$PARALLEL_JOBS" ]]; do
+      sleep 0.1
+    done
+  else
+    # Sequential execution
+    sync_repo "$proj_dir" "$TOTAL_REPOS"
+  fi
+done < <(find "$BASE_DEV_DIR" -name ".git" -prune -print0 2>/dev/null)
+
+# Wait for all background jobs to finish
+wait
+
+# Aggregate results from status files
+for status_f in "$TMP_RESULTS_DIR"/status_*; do
+  [[ -e "$status_f" ]] || continue
+  case $(cat "$status_f") in
+    success) ((SYNCED_REPOS++)) ;;
+    fail)    ((FAILED_REPOS++)) ;;
+    found)   ((SKIPPED_REPOS++)) ;;
+    skip)    ((SKIPPED_REPOS++)) ;;
+    unknown) ((FAILED_REPOS++)) ;; # Process crashed or failed silently
+  esac
+done
+
+echo "------------------------------------------"
+echo "Recursive sync complete."
+echo "Total repositories found: $TOTAL_REPOS"
+echo "Successfully synced:      $SYNCED_REPOS"
+echo "Failed/Conflicts:         $FAILED_REPOS"
+echo "Skipped/No changes:       $SKIPPED_REPOS"
