@@ -281,7 +281,7 @@ sync_repo() {
       
       # In verbose mode, show the pull output
       if [[ "$VERBOSE" == true ]]; then
-        echo "$pull_output" | sed 's/^/      /'
+        echo "$pull_output" | sed 's/^/      Pull: /'
       fi
 
       # Check for conflicts immediately after pull
@@ -303,7 +303,7 @@ sync_repo() {
 
       # In verbose mode, show the push output
       if [[ "$VERBOSE" == true ]]; then
-        echo "$push_output" | sed 's/^/      /'
+        echo "$push_output" | sed 's/^/      Push: /'
       fi
 
       # Check if HEAD moved (meaning pull changed something or commit was made)
@@ -319,10 +319,10 @@ sync_repo() {
         fi
         
         if [[ "$action_taken" == true ]]; then
-          echo "  [+] Successfully synced $branch."
+          echo "  [+] Successfully synced $branch (Pulled/Committed/Pushed)."
           echo "success" > "$status_file"
         else
-          echo "  [.] Already up to date."
+          echo "  [.] No sync required (Local/Remote already matching)."
           echo "skip" > "$status_file"
         fi
       else
