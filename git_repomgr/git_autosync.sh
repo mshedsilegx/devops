@@ -186,6 +186,7 @@ sync_repo() {
 
     # Capture state before operations (MUST be after pushd)
     head_before=$(git rev-parse HEAD 2>/dev/null || echo "empty")
+    curr_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "none")
 
     # Check if we have a remote named origin
     if ! git remote | grep -q "^origin$"; then
@@ -199,10 +200,10 @@ sync_repo() {
     # 1. Handle local changes (Stage and Commit)
     if [[ -n "$(git status --porcelain)" ]]; then
       if [[ "$DETECT_ONLY" == true ]]; then
-        echo "  [!] Local changes detected (Skipping commit in detect-only mode)."
+        echo "  [!] Local changes detected (Skipping commit in detect-only mode). <$curr_hash>"
         echo "found" > "$status_file"
       else
-        echo "  [!] Local changes detected. Committing..."
+        echo "  [!] Local changes detected. Committing... <$curr_hash>"
 
         # Determine commit message
         if [[ -n "$CUSTOM_COMMIT_MSG" ]]; then
@@ -241,17 +242,17 @@ sync_repo() {
       if [[ "$branch" != "HEAD" ]]; then
         status_output=$(git status -uno 2>/dev/null)
         if echo "$status_output" | grep -q "Your branch is ahead"; then
-          echo "  [!] Branch is ahead of remote."
+          echo "  [!] Branch is ahead of remote. <$curr_hash>"
           echo "found" > "$status_file"
         fi
         if echo "$status_output" | grep -q "Your branch is behind"; then
-          echo "  [!] Branch is behind remote."
+          echo "  [!] Branch is behind remote. <$curr_hash>"
           echo "found" > "$status_file"
         fi
       fi
       # If nothing was found yet, mark as skip
       if grep -q "unknown" "$status_file"; then
-        echo "  [.] No changes detected."
+        echo "  [.] No changes detected. <$curr_hash>"
         echo "skip" > "$status_file"
       fi
     else
@@ -266,7 +267,7 @@ sync_repo() {
 
       # Check if an upstream tracking branch is set
       if ! git rev-parse --abbrev-ref --symbolic-full-name @{u} &> /dev/null; then
-        echo "  [!] No upstream branch set. Attempting to set origin/$branch..."
+        echo "  [!] No upstream branch set. Attempting to set origin/$branch... <$curr_hash>"
         # Only try to set upstream if the remote branch actually exists
         if git ls-remote --exit-code --heads origin "$branch" &> /dev/null; then
           git branch --set-upstream-to="origin/$branch" "$branch" &> /dev/null
@@ -308,6 +309,7 @@ sync_repo() {
 
       # Check if HEAD moved (meaning pull changed something or commit was made)
       head_after=$(git rev-parse HEAD 2>/dev/null || echo "empty")
+      curr_hash=$(git rev-parse --short HEAD 2>/dev/null || echo "none")
       if [[ "$head_before" != "$head_after" ]]; then
         action_taken=true
       fi
@@ -319,10 +321,10 @@ sync_repo() {
         fi
         
         if [[ "$action_taken" == true ]]; then
-          echo "  [+] Successfully synced $branch (Pulled/Committed/Pushed)."
+          echo "  [+] Successfully synced $branch (Pulled/Committed/Pushed). <$curr_hash>"
           echo "success" > "$status_file"
         else
-          echo "  [.] No sync required (Local/Remote already matching)."
+          echo "  [.] No sync required (Local/Remote already matching). <$curr_hash>"
           echo "skip" > "$status_file"
         fi
       else

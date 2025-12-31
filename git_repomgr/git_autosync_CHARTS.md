@@ -51,11 +51,11 @@ Next --> WaitAll
 ### Key Locations
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
-| **2a** | Repository Discovery Loop | Iterates through all .git directories found recursively | `while IFS= read...` | `git_autosync.sh:382` |
-| **2b** | Directory Extraction | Extracts parent directory path from .git location | `dirname` | `git_autosync.sh:384` |
-| **2c** | Parallel Process Launch | Starts sync_repo function in background for parallel execution | `sync_repo &` | `git_autosync.sh:394` |
-| **2d** | Job Limit Management | Waits when max parallel jobs reached | `jobs -p | wc -l` | `git_autosync.sh:403` |
-| **2e** | Find Command Execution | Finds all .git directories using null-delimited output | `find -name ".git"` | `git_autosync.sh:410` |
+| **2a** | Repository Discovery Loop | Iterates through all .git directories found recursively | `while IFS= read...` | `git_autosync.sh:384` |
+| **2b** | Directory Extraction | Extracts parent directory path from .git location | `dirname` | `git_autosync.sh:386` |
+| **2c** | Parallel Process Launch | Starts sync_repo function in background for parallel execution | `sync_repo &` | `git_autosync.sh:396` |
+| **2d** | Job Limit Management | Waits when max parallel jobs reached | `jobs -p | wc -l` | `git_autosync.sh:405` |
+| **2e** | Find Command Execution | Finds all .git directories using null-delimited output | `find -name ".git"` | `git_autosync.sh:412` |
 
 ---
 
@@ -91,10 +91,10 @@ S->>S: Log Outcome & Status
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
 | **3a** | Directory Navigation | Changes to repository directory with error handling | `pushd` | `git_autosync.sh:179` |
-| **3b** | Local Changes Detection | Checks for uncommitted changes using porcelain format | `git status --porcelain` | `git_autosync.sh:200` |
-| **3c** | Stage All Changes | Stages all modifications including deletions and new files | `git add -A` | `git_autosync.sh:215` |
-| **3d** | Pull with Rebase | Pulls remote changes using rebase strategy | `git pull --rebase` | `git_autosync.sh:279` |
-| **3e** | Push to Remote | Pushes local commits to remote repository | `git push` | `git_autosync.sh:301` |
+| **3b** | Local Changes Detection | Checks for uncommitted changes using porcelain format | `git status --porcelain` | `git_autosync.sh:201` |
+| **3c** | Stage All Changes | Stages all modifications including deletions and new files | `git add -A` | `git_autosync.sh:216` |
+| **3d** | Pull with Rebase | Pulls remote changes using rebase strategy | `git pull --rebase` | `git_autosync.sh:280` |
+| **3e** | Push to Remote | Pushes local commits to remote repository | `git push` | `git_autosync.sh:302` |
 
 ---
 
@@ -118,9 +118,9 @@ Terminate --> PurgeTemp
 ### Key Locations
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
-| **4a** | Pull Error Detection | Checks if pull operation failed | `if [[ $pull_exit -ne 0 ]]` | `git_autosync.sh:288` |
-| **4b** | Rebase Conflict Detection | Detects ongoing rebase conflicts | `if [[ -d ".git/rebase..." ]]` | `git_autosync.sh:289` |
-| **4c** | Rebase Abort | Cleans up failed rebase to restore repository state | `git rebase --abort` | `git_autosync.sh:291` |
+| **4a** | Pull Error Detection | Checks if pull operation failed | `if [[ $pull_exit -ne 0 ]]` | `git_autosync.sh:289` |
+| **4b** | Rebase Conflict Detection | Detects ongoing rebase conflicts | `if [[ -d ".git/rebase..." ]]` | `git_autosync.sh:290` |
+| **4c** | Rebase Abort | Cleans up failed rebase to restore repository state | `git rebase --abort` | `git_autosync.sh:292` |
 | **4d** | Background Process Collection | Gathers PIDs of all background jobs for cleanup | `jobs -p` | `git_autosync.sh:144` |
 | **4e** | Process Termination | Gracefully terminates background processes on interrupt | `kill -TERM` | `git_autosync.sh:148` |
 
@@ -144,8 +144,8 @@ Next --> Report
 ### Key Locations
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
-| **5a** | Wait for Completion | Waits for all background processes to finish | `wait` | `git_autosync.sh:413` |
-| **5b** | Results Processing Loop | Iterates through all processed repositories | `for (( i=1; i<=... ))` | `git_autosync.sh:419` |
-| **5c** | Status Reading | Reads processing status from temp files | `cat "$status_f"` | `git_autosync.sh:425` |
-| **5d** | Result Classification | Categorizes results for summary statistics | `case "$outcome" in` | `git_autosync.sh:434` |
-| **5e** | Summary Report | Displays final statistics of sync operation | `echo "Total..."` | `git_autosync.sh:443` |
+| **5a** | Wait for Completion | Waits for all background processes to finish | `wait` | `git_autosync.sh:415` |
+| **5b** | Results Processing Loop | Iterates through all processed repositories | `for (( i=1; i<=... ))` | `git_autosync.sh:421` |
+| **5c** | Status Reading | Reads processing status from temp files | `cat "$status_f"` | `git_autosync.sh:427` |
+| **5d** | Result Classification | Categorizes results for summary statistics | `case "$outcome" in` | `git_autosync.sh:436` |
+| **5e** | Summary Report | Displays final statistics of sync operation | `echo "Total..."` | `git_autosync.sh:445` |

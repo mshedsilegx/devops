@@ -32,7 +32,8 @@ The script is built with several key architectural principles in mind:
 8.  **Portability**: Relies on standard Bash and Git commands, making it compatible with Linux, macOS, WSL, and Git Bash.
 9.  **Information Density**: Employs `-print0` and `git status --porcelain` to handle complex file paths and provide stable detection logic.
 10. **Progress Transparency**: Provides a real-time progress indicator (`Processing repositories...`) in both sequential and parallel modes when verbose output is enabled.
-11. **Quiet by Default**: Optimizes for core information. Unless `--verbose` is enabled, the script only reports repositories where actions were taken (commits made, updates pulled, or changes pushed), errors occurred, or changes were detected in dry-run mode.
+11. **Quiet by Default**: Optimizes for core information. Unless `--verbose` is enabled, the script only reports repositories where actions were taken (commits made, updates pulled, or changes pushed), errors occurred, or changes were detected in dry-run mode. Each status message includes the current short Git hash at the end of the line in angle brackets (e.g., `<a1b2c3d>`) for easy reference.
+12. **Clear Network Status**: In verbose mode, the script explicitly labels `Pull:` and `Push:` operations to distinguish between remote updates and local uploads.
 
 ## Command Line Arguments
 
@@ -88,7 +89,8 @@ In `--detect-only` mode, the script performs a passive check, reporting on both 
 | `git status -uno` | Checks ahead/behind status relative to remote in detect-only mode. |
 | `git add -A` | Stages all changes (including deletions and new files). |
 | `git commit -m "<msg>"` | Creates a local commit with a timestamp or custom message. |
-| `git rev-parse HEAD` | Captures the repository hash before and after sync to detect changes reliably. |
+| `git rev-parse HEAD` | Captures the full repository hash before and after sync to detect changes reliably. |
+| `git rev-parse --short HEAD` | Retrieves the short hash for display in status messages. |
 | `git rev-parse --abbrev-ref HEAD` | Retrieves the current branch name. |
 | `git rev-parse --abbrev-ref --symbolic-full-name @{u}` | Checks if the current branch has an upstream tracking branch configured. |
 | `git ls-remote --exit-code --heads origin "$branch"` | Verifies if the remote branch exists before attempting to set upstream. |
