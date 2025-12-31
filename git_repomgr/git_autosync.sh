@@ -142,7 +142,7 @@ if [[ -n "$LOG_FILE" ]]; then
   exec > >(tee -a "$LOG_FILE") 2>&1
 fi
 
-echo "Git Autosync Utility - Job Stamp: $(date '+%Y/%m/%d-%H:%M:%S')"
+echo "*** Git Autosync Utility - Job Stamp: $(date '+%Y/%m/%d-%H:%M:%S')"
 
 # --- Validation ---
 # Ensure required parameters are provided and environment is ready.
@@ -448,7 +448,7 @@ done < <(find "$BASE_DEV_DIR" -name ".git" -prune -print0 2>/dev/null)
 if [[ ${#SYNC_PIDS[@]} -gt 0 ]]; then
   wait "${SYNC_PIDS[@]}"
 fi
-[[ "$VERBOSE" == true ]] && echo -e "\nAll repositories processed. Generating summary..."
+[[ "$VERBOSE" == true ]] && echo -e "\nAll repositories processed. Generating summary...\n"
 
 # Aggregate results and display captured logs in order.
 # This ensures that even in parallel mode, the output for each project
