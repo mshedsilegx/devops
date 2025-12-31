@@ -7,14 +7,14 @@ The main entry point that parses command-line arguments and sets up the executio
 
 ```mermaid
 graph TD
-Start --> ParseArgs
-ParseArgs --> ProcessArg
-ProcessArg --> Validate
+Start --> ParseArgs["[1a] ParseArgs"]
+ParseArgs --> LogRedirection["[1e] Log Redirection"]
+LogRedirection --> Validate["[1b] Validate"]
 Validate -- Fail --> Usage
 Validate -- Pass --> SetupEnv
-SetupEnv --> CreateTemp
+SetupEnv --> CreateTemp["[1c] CreateTemp"]
 SetupEnv --> SetGitMode
-SetupEnv --> RegisterSignals
+SetupEnv --> RegisterSignals["[1d] RegisterSignals"]
 RegisterSignals --> Discovery
 ```
 
@@ -34,13 +34,13 @@ Finds all git repositories recursively and orchestrates their processing.
 
 ```mermaid
 graph TD
-Discovery --> FindCmd
-FindCmd --> Loop
-Loop --> ExtractPath
+Discovery --> FindCmd["[2e] FindCmd"]
+FindCmd --> Loop["[2a] Loop"]
+Loop --> ExtractPath["[2b] ExtractPath"]
 ExtractPath --> Progress
 Progress --> ModeCheck
-ModeCheck -- Parallel --> ParallelLaunch
-ParallelLaunch --> LimitCheck
+ModeCheck -- Parallel --> ParallelLaunch["[2c] ParallelLaunch"]
+ParallelLaunch --> LimitCheck["[2d] LimitCheck"]
 LimitCheck -- Yes --> Wait
 Wait --> LimitCheck
 LimitCheck -- No --> Next
@@ -68,21 +68,21 @@ sequenceDiagram
 participant S as Script
 participant G as Git Repository
 participant R as Remote (Origin)
-S->>G: Change to directory
-S->>G: Detect Local Changes (porcelain)
+S->>G: [3a] Change to directory
+S->>G: [3b] Detect Local Changes
 alt Changes Detected
-S->>G: git add -A
+S->>G: [3c] git add -A
 S->>G: git commit -m "Auto-sync..."
 end
 S->>G: Get Current Branch
 S->>G: Check Upstream Tracking
 S->>R: Verify Remote Branch exists
-S->>G: Pull with Rebase
+S->>G: [3d] Pull with Rebase
 G->>R: Fetch & Rebase
 alt Conflict?
 S->>G: git rebase --abort
 else Success
-S->>G: Push to Remote
+S->>G: [3e] Push to Remote
 G->>R: Upload Changes
 end
 S->>S: Log Outcome & Status
@@ -105,15 +105,16 @@ Manages errors, conflicts, and cleanup operations during synchronization.
 ```mermaid
 graph TD
 Sync --> Pull
-Pull --> ExitCheck
-ExitCheck -- No --> ConflictCheck
-ConflictCheck -- Yes --> Abort
+Pull --> ExitCheck["[4a] ExitCheck"]
+ExitCheck -- No --> ConflictCheck["[4b] ConflictCheck"]
+ConflictCheck -- Yes --> Abort["[4c] Abort"]
 Abort --> Fail
 Signal --> Cleanup
 Cleanup --> JobsCheck
-JobsCheck -- Yes --> Terminate
+JobsCheck -- Yes --> Terminate["[4e] Terminate"]
 JobsCheck -- No --> PurgeTemp
 Terminate --> PurgeTemp
+pids["[4d] Collect PIDs"]
 ```
 
 ### Key Locations
@@ -132,14 +133,14 @@ Collects and displays results from parallel repository processing.
 
 ```mermaid
 graph TD
-Wait --> ProcessLoop
-ProcessLoop --> ReadStatus
+Wait["[5a] Wait"] --> ProcessLoop["[5b] ProcessLoop"]
+ProcessLoop --> ReadStatus["[5c] ReadStatus"]
 ReadStatus --> DisplayLog
 DisplayLog -- Yes --> CatLog
-DisplayLog -- No --> Classify
+DisplayLog -- No --> Classify["[5d] Classify"]
 CatLog --> Classify
 Classify --> Next
-Next --> Report
+Next --> Report["[5e] Report"]
 ```
 
 ### Key Locations

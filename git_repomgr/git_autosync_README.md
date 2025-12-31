@@ -72,6 +72,12 @@ Sync using all available CPU cores:
 ./git_autosync.sh --base-folder=~/projects --message="Workstation backup" --parallel=4,1 --verbose
 ```
 
+### Full Synchronization with Logging
+Sync all repositories and save the entire session output to a log file:
+```bash
+./git_autosync.sh --base-folder=~/projects --logfile=~/logs/sync_$(date +%Y%m%d).log
+```
+
 ## Git Strategy and Commands
 
 The script follows a **Decoupled Sync Strategy**:
