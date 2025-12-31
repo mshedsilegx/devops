@@ -4,7 +4,7 @@
 #  v1.0.0xg  2025/12/30  XDG
 # -------------------------------------
 # Syntax: ./git_autosync.sh --base-folder=<base_folder> [options]
-# Options: [--detect-only|--message="<msg>"|--verbose|--parallel=N,T]
+# Options: [--detect-only|--message="<msg>"|--verbose|--parallel=N,T|--logfile=<path>]
 # Prereqs: git
 
 # Summary of Global Configs for a Clean Workflow
@@ -23,12 +23,14 @@
 # VERBOSE: If true, prints extra separators for better readability.
 # PARALLEL_JOBS: Max number of background processes (default 1).
 # PARALLEL_DELAY: Sleep timer before starting another background process (default 0).
+# LOG_FILE: Path to a file where all output will be saved (optional).
 BASE_DEV_DIR=""
 DETECT_ONLY=false
 CUSTOM_COMMIT_MSG=""
 VERBOSE=false
 PARALLEL_JOBS=1
 PARALLEL_DELAY=0
+LOG_FILE=""
 
 # Detect number of processors for parallel default
 if command -v nproc &>/dev/null; then
@@ -57,6 +59,7 @@ usage() {
   echo "  --verbose             Show more output"
   echo "  --parallel[=N,T]      Enable parallel sync (N=processes, T=delay in sec)"
   echo "                        N defaults to $NPROC cores, T defaults to 0s"
+  echo "  --logfile=<path>      Save all output to the specified log file"
   echo "  --help                Show this help message"
   exit "$exit_code"
 }
@@ -106,6 +109,10 @@ while [[ $# -gt 0 ]]; do
       fi
       shift
     ;;
+    --logfile=*)
+      LOG_FILE="${1#*=}"
+      shift
+    ;;
     --help)
       usage 0
     ;;
@@ -119,6 +126,21 @@ done
 # Ensure Git operations are non-interactive to prevent hangs in automation
 export GIT_TERMINAL_PROMPT=0
 export GIT_SSH_COMMAND="ssh -o BatchMode=yes"
+
+# --- Setup Logging ---
+# If a log file is specified, redirect all stdout and stderr to it using tee.
+if [[ -n "$LOG_FILE" ]]; then
+  # Ensure the directory for the log file exists
+  LOG_DIR=$(dirname "$LOG_FILE")
+  if [[ ! -d "$LOG_DIR" ]]; then
+    if ! mkdir -p "$LOG_DIR" 2>/dev/null; then
+      echo "Error: Could not create directory for log file: $LOG_DIR"
+      exit 6
+    fi
+  fi
+  # Redirect stdout and stderr to the log file while still printing to terminal
+  exec > >(tee -a "$LOG_FILE") 2>&1
+fi
 
 # --- Validation ---
 # Ensure required parameters are provided and environment is ready.

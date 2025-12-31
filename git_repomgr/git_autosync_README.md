@@ -44,6 +44,7 @@ The script is built with several key architectural principles in mind:
 | `--message="<msg>"` | Custom commit message for auto-generated commits. | String | `Auto-sync: YYYY-MM-DD HH:MM:SS` |
 | `--verbose` | Enables detailed output, including progress separators for each project. | Flag | `false` |
 | `--parallel[=N,T]` | Enables parallel execution. `N` is the number of concurrent processes, `T` is an optional delay in seconds. | String | `1,0` (or `NPROC` if flag is standalone) |
+| `--logfile=<path>` | Path to a file where all console output will be permanently saved. | String | N/A |
 | `--help` | Displays the usage instructions and exits. | Flag | N/A |
 
 ## Examples
