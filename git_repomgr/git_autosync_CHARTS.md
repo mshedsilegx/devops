@@ -52,11 +52,11 @@ Next --> WaitAll
 ### Key Locations
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
-| **2a** | Repository Discovery Loop | Iterates through all .git directories found recursively | `while IFS= read...` | `git_autosync.sh:406` |
-| **2b** | Directory Extraction | Extracts parent directory path from .git location | `dirname` | `git_autosync.sh:408` |
-| **2c** | Parallel Process Launch | Starts sync_repo function in background for parallel execution | `sync_repo &` | `git_autosync.sh:418` |
-| **2d** | Job Limit Management | Waits when max parallel jobs reached | `jobs -p | wc -l` | `git_autosync.sh:427` |
-| **2e** | Find Command Execution | Finds all .git directories using null-delimited output | `find -name ".git"` | `git_autosync.sh:434` |
+| **2a** | Repository Discovery Loop | Iterates through all .git directories found recursively | `while IFS= read...` | `git_autosync.sh:407` |
+| **2b** | Directory Extraction | Extracts parent directory path from .git location | `dirname` | `git_autosync.sh:409` |
+| **2c** | Parallel Process Launch | Starts sync_repo function in background for parallel execution | `sync_repo &` | `git_autosync.sh:419` |
+| **2d** | Job Limit Management | Waits when max parallel jobs reached | `while true; do ...` | `git_autosync.sh:429` |
+| **2e** | Find Command Execution | Finds all .git directories using null-delimited output | `find -name ".git"` | `git_autosync.sh:443` |
 
 ---
 
@@ -146,8 +146,8 @@ Next --> Report["[5e] Report"]
 ### Key Locations
 | ID | Title | Description | Code | Path:Line |
 |:---|:---|:---|:---|:---|
-| **5a** | Wait for Completion | Waits for all background processes to finish | `wait` | `git_autosync.sh:437` |
-| **5b** | Results Processing Loop | Iterates through all processed repositories | `for (( i=1; i<=... ))` | `git_autosync.sh:443` |
-| **5c** | Status Reading | Reads processing status from temp files | `cat "$status_f"` | `git_autosync.sh:449` |
-| **5d** | Result Classification | Categorizes results for summary statistics | `case "$outcome" in` | `git_autosync.sh:458` |
-| **5e** | Summary Report | Displays final statistics of sync operation | `echo "Total..."` | `git_autosync.sh:467` |
+| **5a** | Wait for Completion | Waits for all specific sync background processes | `wait "${SYNC_PIDS[@]}"` | `git_autosync.sh:447` |
+| **5b** | Results Processing Loop | Iterates through all processed repositories | `for (( i=1; i<=... ))` | `git_autosync.sh:454` |
+| **5c** | Status Reading | Reads processing status from temp files | `cat "$status_f"` | `git_autosync.sh:460` |
+| **5d** | Result Classification | Categorizes results for summary statistics | `case "$outcome" in` | `git_autosync.sh:469` |
+| **5e** | Summary Report | Displays final statistics of sync operation | `echo "Total..."` | `git_autosync.sh:478` |

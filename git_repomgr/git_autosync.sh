@@ -400,6 +400,7 @@ TOTAL_REPOS=0
 SYNCED_REPOS=0
 FAILED_REPOS=0
 SKIPPED_REPOS=0
+SYNC_PIDS=()
 
 # Find all directories/files named .git (to support submodules and worktrees)
 # Logic for parallel or sequential execution
@@ -416,6 +417,7 @@ while IFS= read -r -d '' git_item; do
   if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
     # Background the process
     sync_repo "$proj_dir" "$TOTAL_REPOS" &
+    SYNC_PIDS+=($!)
     
     # Sleep if requested
     if [[ "$PARALLEL_DELAY" -gt 0 ]]; then
@@ -423,8 +425,15 @@ while IFS= read -r -d '' git_item; do
     fi
     
     # Job management: ensure we don't exceed PARALLEL_JOBS
-    # We use jobs -p to count active background tasks
-    while [[ "$(jobs -p | wc -l)" -ge "$PARALLEL_JOBS" ]]; do
+    # We filter SYNC_PIDS to only count those still running
+    while true; do
+      RUNNING_COUNT=0
+      for pid in "${SYNC_PIDS[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+          ((RUNNING_COUNT++))
+        fi
+      done
+      [[ "$RUNNING_COUNT" -lt "$PARALLEL_JOBS" ]] && break
       sleep 0.1
     done
   else
@@ -434,7 +443,9 @@ while IFS= read -r -d '' git_item; do
 done < <(find "$BASE_DEV_DIR" -name ".git" -prune -print0 2>/dev/null)
 
 # Wait for all background jobs to finish (no-op in sequential mode)
-wait
+if [[ ${#SYNC_PIDS[@]} -gt 0 ]]; then
+  wait "${SYNC_PIDS[@]}"
+fi
 [[ "$VERBOSE" == true ]] && echo -e "\nAll repositories processed. Generating summary..."
 
 # Aggregate results and display captured logs in order.
