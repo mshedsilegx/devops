@@ -142,6 +142,8 @@ if [[ -n "$LOG_FILE" ]]; then
   exec > >(tee -a "$LOG_FILE") 2>&1
 fi
 
+echo "Git Autosync Utility - Job Stamp: $(date '+%Y/%m/%d-%H:%M:%S')"
+
 # --- Validation ---
 # Ensure required parameters are provided and environment is ready.
 if [[ -z "$BASE_DEV_DIR" ]]; then
