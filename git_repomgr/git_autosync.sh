@@ -1,7 +1,7 @@
 #!/bin/bash
 # -------------------------------------
 #  $HOME/scripts/git_autosync.sh
-#  v2.7.0xg  2025/12/30  XDG
+#  v1.0.0xg  2025/12/30  XDG
 # -------------------------------------
 # Syntax: ./git_autosync.sh --base-folder=<base_folder> [options]
 # Options: [--detect-only|--message="<msg>"|--verbose|--parallel=N,T]
@@ -127,8 +127,9 @@ if [[ -z "$BASE_DEV_DIR" ]]; then
   usage
 fi
 
-# Create a temporary directory for tracking results in parallel mode
-# This allows background processes to communicate their status to the parent.
+# Create a temporary directory for tracking results.
+# This allows background processes to communicate their status and log output
+# to the parent process, ensuring atomic and ordered reporting.
 if ! TMP_RESULTS_DIR=$(mktemp -d 2>/dev/null || mktemp -d -t 'git_autosync'); then
   echo "Error: Failed to create temporary directory."
   exit 5
@@ -168,7 +169,9 @@ sync_repo() {
   echo "unknown" > "$status_file"
   action_taken=false
 
-  # Redirect all output for this project to a log file to avoid interleaving
+  # Redirect all output for this project to a log file.
+  # This prevents interleaving in parallel mode and allows for ordered 
+  # sequential reporting at the end of the script execution.
   {
     echo "[$index] Syncing: $proj_dir"
     
@@ -176,6 +179,8 @@ sync_repo() {
     if ! pushd "$proj_dir" &> /dev/null; then
       echo "  [X] Failed to enter directory"
       echo "fail" > "$status_file"
+      popd &> /dev/null
+      [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
       return
     fi
 
@@ -187,6 +192,7 @@ sync_repo() {
       echo "  [.] No 'origin' remote found. Skipping sync."
       echo "skip" > "$status_file"
       popd &> /dev/null
+      [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
       return
     fi
 
@@ -211,6 +217,7 @@ sync_repo() {
           echo "  [X] Error: Commit failed."
           echo "fail" > "$status_file"
           popd &> /dev/null
+          [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
           return
         fi
         action_taken=true
@@ -225,6 +232,7 @@ sync_repo() {
       echo "  [X] Error: Could not detect current branch."
       echo "fail" > "$status_file"
       popd &> /dev/null
+      [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
       return
     fi
 
@@ -243,6 +251,7 @@ sync_repo() {
       fi
       # If nothing was found yet, mark as skip
       if grep -q "unknown" "$status_file"; then
+        echo "  [.] No changes detected."
         echo "skip" > "$status_file"
       fi
     else
@@ -251,6 +260,7 @@ sync_repo() {
         echo "  [X] Error: Detached HEAD detected. Skipping network sync."
         echo "fail" > "$status_file"
         popd &> /dev/null
+        [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
         return
       fi
 
@@ -281,6 +291,7 @@ sync_repo() {
           git rebase --abort &> /dev/null
           echo "fail" > "$status_file"
           popd &> /dev/null
+          [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
           return
         fi
         echo "  [?] Note: Pull failed or branch doesn't exist on origin yet."
@@ -325,12 +336,8 @@ sync_repo() {
     [[ "$VERBOSE" == true ]] && echo "------------------------------------------"
   } > "$log_file" 2>&1
 
-  # Output the captured log to the terminal in one block if verbose 
-  # or if something core actually happened (action taken, error, or detection).
-  outcome=$(cat "$status_file" 2>/dev/null)
-  if [[ "$VERBOSE" == true || "$outcome" == "success" || "$outcome" == "fail" || "$outcome" == "found" ]]; then
-    cat "$log_file"
-  fi
+  # The log is captured in $log_file and will be printed in order at the end
+  # of the script execution to ensure clean, non-interleaved output.
 }
 
 # Check if git is installed
@@ -376,9 +383,13 @@ while IFS= read -r -d '' git_item; do
   ((TOTAL_REPOS++))
   proj_dir=$(dirname "$git_item")
   
+  # Progress indicator for all modes
+  if [[ "$VERBOSE" == true ]]; then
+     echo -ne "Processing repositories... ($TOTAL_REPOS found)\r"
+  fi
+
   # Run sync_repo
   if [[ "$PARALLEL_JOBS" -gt 1 ]]; then
-    [[ "$VERBOSE" == true ]] && echo "[$TOTAL_REPOS] Starting: $proj_dir"
     # Background the process
     sync_repo "$proj_dir" "$TOTAL_REPOS" &
     
@@ -398,23 +409,38 @@ while IFS= read -r -d '' git_item; do
   fi
 done < <(find "$BASE_DEV_DIR" -name ".git" -prune -print0 2>/dev/null)
 
-# Wait for all background jobs to finish
+# Wait for all background jobs to finish (no-op in sequential mode)
 wait
+[[ "$VERBOSE" == true ]] && echo -e "\nAll repositories processed. Generating summary..."
 
-# Aggregate results from status files
-for status_f in "$TMP_RESULTS_DIR"/status_*; do
+# Aggregate results and display captured logs in order.
+# This ensures that even in parallel mode, the output for each project
+# is displayed atomically and in the sequence they were discovered.
+for (( i=1; i<=TOTAL_REPOS; i++ )); do
+  status_f="$TMP_RESULTS_DIR/status_$i"
+  log_f="$TMP_RESULTS_DIR/log_$i"
+  
   [[ -e "$status_f" ]] || continue
-  case $(cat "$status_f") in
+  
+  outcome=$(cat "$status_f" 2>/dev/null)
+  
+  # Display log if criteria met
+  if [[ "$VERBOSE" == true || "$outcome" == "success" || "$outcome" == "fail" || "$outcome" == "found" ]]; then
+    if [[ -f "$log_f" ]]; then
+      cat "$log_f"
+    fi
+  fi
+
+  case "$outcome" in
     success) ((SYNCED_REPOS++)) ;;
     fail)    ((FAILED_REPOS++)) ;;
     found)   ((SKIPPED_REPOS++)) ;;
     skip)    ((SKIPPED_REPOS++)) ;;
-    unknown) ((FAILED_REPOS++)) ;; # Process crashed or failed silently
+    unknown) ((FAILED_REPOS++)) ;;
   esac
 done
 
-echo "------------------------------------------"
-echo "Recursive sync complete."
+echo -e "\nRecursive sync complete."
 echo "Total repositories found: $TOTAL_REPOS"
 echo "Successfully synced:      $SYNCED_REPOS"
 echo "Failed/Conflicts:         $FAILED_REPOS"
