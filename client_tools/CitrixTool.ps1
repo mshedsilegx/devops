@@ -21,9 +21,9 @@
     .\CitrixTool.ps1 -Restore -Path "C:\Backups\MYPC_citrixbackup_20260114-104000.zip"
     Restores Citrix settings from the specified ZIP file.
 .NOTES
-    Version: 1.0.0
-    Author: DevOps Team
-    Release Date: January 2026
+    Version: v1.0.1xg
+    Author: XdG / MIS Center
+    Release Date: 2026/01/14
 #>
 
 [CmdletBinding(DefaultParameterSetName = "Help")]
