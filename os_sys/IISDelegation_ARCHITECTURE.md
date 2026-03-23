@@ -18,22 +18,31 @@ The toolset is designed around the principle of **Least Privilege Delegation** t
 
 ```mermaid
 graph TD
-    A[Administrator] -->|Runs| B(IISDelegationSet.ps1)
-    B --> B1[Backup IIS Config]
-    B --> B2[Apply NTFS ACLs]
-    B --> B3[Apply Registry ACLs]
-    B --> B4[Inject Service SDDLs]
-    B --> B5[Unlock IIS Sections]
-    
-    C[Delegated User] -->|Runs| D(IISDelegationValidate.ps1)
-    D --> D1[Verify NTFS/Registry ACLs]
-    D --> D2[Verify Service Access]
-    D --> D3[Functional Write Test]
-    
-    A -->|Rollback| E(IISDelegationUndo.ps1)
-    E --> E1[Re-lock IIS Sections]
-    E --> E2[Restore Default SDDLs]
-    E --> E3[Remove ACEs]
+    subgraph Setup ["1. Setup Phase (Admin)"]
+        A[Administrator] --> B(IISDelegationSet.ps1)
+        B --> B1[Backup IIS Config]
+        B1 --> B2[Apply NTFS ACLs]
+        B2 --> B3[Apply Registry ACLs]
+        B3 --> B4[Inject Service SDDLs]
+        B4 --> B5[Unlock IIS Sections]
+    end
+
+    subgraph Validation ["2. Validation Phase (User)"]
+        C[Delegated User] --> D(IISDelegationValidate.ps1)
+        D --> D1[Verify NTFS/Registry ACLs]
+        D1 --> D2[Verify Service Access]
+        D2 --> D3[Functional Write Test]
+    end
+
+    subgraph Rollback ["3. Rollback Phase (Admin)"]
+        A2[Administrator] --> E(IISDelegationUndo.ps1)
+        E --> E1[Re-lock IIS Sections]
+        E1 --> E2[Restore Default SDDLs]
+        E2 --> E3[Remove ACEs]
+    end
+
+    B5 -.-> C
+    D3 -.-> A2
 ```
 
 ### 2.2. Data Sequences
