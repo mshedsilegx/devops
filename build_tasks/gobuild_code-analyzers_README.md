@@ -1,7 +1,7 @@
 # Go Build Pipeline: Code Analyzers
 
 ## Application Overview and Objectives
-The **Go Build Pipeline for Code Analyzers** is an automated shell-based build system designed to compile, cross-compile, and package a curated suite of 17+ essential Go development and static analysis tools.
+The **Go Build Pipeline for Code Analyzers** is an automated shell-based build system designed to compile, cross-compile, and package a curated suite of 20 essential Go development and static analysis tools.
 
 ### Core Objectives:
 *   **Automated Build Management**: Streamline the process of fetching, updating, and compiling multiple disparate tool repositories into a unified distribution.
@@ -68,7 +68,7 @@ graph TD
 ## Go Utilities Details
 The following table provides a high-level summary of the tools included in this pipeline:
 
-| Tool (17) | Repo URL | Short Description | Recommended Command |
+| Tool (20) | Repo URL | Short Description | Recommended Command |
 | :--- | :--- | :--- | :--- |
 | **gofumpt** | github.com/mvdan/gofumpt | Stricter, more opinionated Go formatter | `gofumpt -w -extra .` |
 | **govulncheck** | github.com/golang/vuln | Official vulnerability scanner for Go code | `govulncheck ./...` |
@@ -87,6 +87,9 @@ The following table provides a high-level summary of the tools included in this 
 | **impl** | github.com/josharian/impl | Generates method stubs for interfaces | `impl 'r *Receiver' io.Reader` |
 | **go-callvis** | github.com/ondrajz/go-callvis | Interactive graph visualization | `go-callvis ./...` |
 | **benchstat** | github.com/golang/perf | Computes stats about benchmarks | `benchstat old.txt new.txt` |
+| **mockery** | github.com/vektra/mockery | Generates type-safe mocks for interfaces | `mockery --all` |
+| **copyloopvar** | github.com/karamaru-alpha/copyloopvar | Detects loop variable pointer issues | `copyloopvar ./...` |
+| **goleak** | github.com/uber-go/goleak | Detects Goroutine leaks in tests | (Library Use Only) |
 
 ---
 
@@ -112,9 +115,9 @@ The following table provides a high-level summary of the tools included in this 
 
 ### 4. staticcheck
 *   **Objectives**: Detect bugs, performance issues, and offer sophisticated code simplifications.
-*   **Core Components**: `staticcheck` binary along with specialized layout tools like `structlayout`.
+*   **Core Components**: `staticcheck` binary along with specialized layout tools: `structlayout`, `structlayout-optimize`, and `structlayout-pretty`.
 *   **Functionality**: Applies hundreds of advanced checks focusing on correctness and maintainability. It is widely considered the best-in-class static analyzer for identifying logic flaws that other tools miss.
-*   **How to use**: Run `staticcheck ./...` for a comprehensive codebase analysis.
+*   **How to use**: Run `staticcheck ./...` for a comprehensive codebase analysis. Use `structlayout` to analyze the memory layout of Go structs.
 
 ### 5. gopls
 *   **Objectives**: Power modern IDE features including autocompletion, navigation, and refactoring.
@@ -194,6 +197,24 @@ The following table provides a high-level summary of the tools included in this 
 *   **Functionality**: Compares the output of `go test -bench` from two different runs (e.g., master vs. feature branch) and determines if a performance delta is statistically significant or just noise.
 *   **How to use**: Run `benchstat old_bench.txt new_bench.txt` to see the performance percentage change.
 
+### 18. mockery
+*   **Objectives**: Automate the generation of type-safe mocks for Go interfaces.
+- **Core Components**: `mockery` binary.
+- **Functionality**: Scans your Go source code and generates implementations of your interfaces that can be used in unit tests to simulate external dependencies.
+- **How to use**: Run `mockery --all` to generate mocks for all interfaces in the current directory.
+
+### 19. copyloopvar
+*   **Objectives**: Prevent common concurrency bugs by detecting loop variable capture issues.
+- **Core Components**: `copyloopvar` binary.
+- **Functionality**: Identifies places in your code where a reference to a loop variable is taken (e.g., in a goroutine or closure), which often leads to unexpected behavior in older Go versions or complex logic.
+- **How to use**: Run `copyloopvar ./...` to scan your project.
+
+### 20. goleak
+*   **Objectives**: Verify that no Goroutines are leaked during test execution.
+- **Core Components**: Integration reference (Library only).
+- **Functionality**: Unlike the other tools, `goleak` is not a standalone binary but a library you import into your `_test.go` files to check for leaked goroutines after tests finish.
+- **How to use**: Add `defer goleak.VerifyNone(t)` to your test functions or use it in `TestMain`.
+
 ---
 
 ## Dependencies
@@ -216,7 +237,7 @@ The following table provides a high-level summary of the tools included in this 
 | :--- | :--- | :--- | :--- |
 | `--help` | Displays the help menu and list of available targets. | Flag | N/A |
 | `--clean-cache` | Clears the Zig global cache and Go build cache before building. | Flag | N/A |
-| `all` | Compiles all 17 tools concurrently in parallel mode. | Target | N/A |
+| `all` | Compiles all 20 targets concurrently in parallel mode. | Target | N/A |
 | `build_<name>` | Build a specific tool (e.g., `build_gofumpt`, `build_delve`). | Target | N/A |
 
 ---

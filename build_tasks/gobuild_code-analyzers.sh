@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# -------------------------------------------------------------------
-#  f:/stage/install/compile/golangci-lint/gobuild_code-analyzers.sh
-#  v1.1.1xg  2026/03/30  XDG
-# -------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+#  e:/data/devel/build/code/private/devops/build_tasks/gobuild_code-analyzers.sh
+#  v1.1.2xg  2026/03/30  XDG
+# --------------------------------------------------------------------------------
 # Objectives:
 #   - Automated Build Pipeline: Provide a streamlined, reproducible process for building a curated suite of Go static analysis and development tools.
 #   - Unified Tooling: Maintain a consistent set of 17+ essential Go tools in a portable, pre-compiled format.
@@ -26,48 +26,72 @@
 # -------------------------------------------------------------------
 # Syntax: gobuild_code-analyzers.sh
 # Example: gobuild_code-analyzers.sh
-# References: 
+#
+# References: see below the toolchain organized by the nature of each tool.
 # +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
-# | Tool (17)      | Repo URL                                 | Short Description                          | Recommended Command Line                 |
+# | Tool (20)      | Repo URL                                 | Short Description                          | Recommended Command Line                 |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: FORMATTING & STYLE                                                                                                                          |
 # +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
 # | gofumpt        | github.com/mvdan/gofumpt                 | Stricter, more opinionated Go formatter    | gofumpt -w -extra .                      |
-# | govulncheck    | github.com/golang/vuln                   | Official vulnerability scanner for Go code | govulncheck ./...                        |
+# | gocritic       | github.com/go-critic/go-critic           | Finds stylistic and performance micro-bugs | gocritic check ./...                     |
+# | goconst        | github.com/jgautheron/goconst            | Finds repeated strings to make constants   | goconst -min-occurrences 3 ./...         |
+# | go-mnd         | github.com/tommy-muehle/go-mnd           | Detects magic numbers (unnamed constants)  | mnd ./...                                |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: STATIC ANALYSIS & LINTING                                                                                                                   |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
 # | golangci-lint  | github.com/golangci/golangci-lint        | Fast, parallel runner for dozens of linters| golangci-lint run ./... --no-config      |
 # | staticcheck    | github.com/dominikh/go-tools             | Advanced static analysis with all checks   | staticcheck -checks="all" ./...          |
-# | gopls          | go.googlesource.com/tools                | Official Go Language Server (IDE logic)    | gopls check ./...                        |
-# | delve (dlv)    | github.com/go-delve/delve                | The standard debugger for the Go language  | dlv debug ./main.go or <packages_path>   |
-# | gocyclo        | github.com/fzipp/gocyclo                 | Measures cyclomatic complexity of functions| gocyclo -over 15 .                       |
-# | goconst        | github.com/jgautheron/goconst            | Finds repeated strings to make constants   | goconst -min-occurrences 3 ./...         |
-# | interfacebloat | github.com/sashamelentyev/interfacebloat | Flags interfaces with too many methods     | interfacebloat -max 5 ./...              |
 # | nilaway        | github.com/uber-go/nilaway               | Advanced static nil-panic detector         | nilaway -include-pkgs="<pkg>" ./...      |
+# | gocyclo        | github.com/fzipp/gocyclo                 | Measures cyclomatic complexity of functions| gocyclo -over 15 .                       |
+# | interfacebloat | github.com/sashamelentyev/interfacebloat | Flags interfaces with too many methods     | interfacebloat -max 5 ./...              |
+# | copyloopvar    | github.com/karamaru-alpha/copyloopvar    | Detects loop variable pointer issues       | copyloopvar ./...                        |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: SECURITY & VULNERABILITY                                                                                                                    |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | govulncheck    | github.com/golang/vuln                   | Official vulnerability scanner for Go code | govulncheck ./...                        |
 # | gosec          | github.com/securego/gosec                | Inspects source code for security problems | gosec -fmt=text ./...                    |
-# | go.rice        | github.com//GeertJohan/go.rice           | Embeds static assets into Go binaries      | rice embed-go                            |
-# | go-mnd         | github.com/tommy-muehle/go-mnd           | Detects magic numbers (unnamed constants)  | mnd ./...                                |
-# | gocritic       | github.com/go-critic/go-critic           | Finds stylistic and performance micro-bugs | gocritic check ./...                     |
-# | impl           | github.com/josharian/impl                | Generates method stubs for interfaces      | impl 'r *Receiver' io.Reader             |
-# | go-callvis     | github.com/ondrajz/go-callvis            | Interactive graph visualization of Go code | go-callvis -format=png -file=<output>    |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: TESTING & PERFORMANCE                                                                                                                       |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | mockery        | github.com/vektra/mockery                | Generates type-safe mocks for interfaces   | mockery --all --inpackage                |
+# | goleak         | github.com/uber-go/goleak                | Verifies no Goroutines are leaked in tests | (Inside _test.go) goleak.VerifyNone(t)   |
 # | benchstat      | github.com/golang/perf                   | Computes statistics about Go benchmarks    | benchstat old.txt new.txt                |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: DEVELOPMENT & VISUALIZATION                                                                                                                 |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | gopls          | go.googlesource.com/tools                | Official Go Language Server (IDE logic)    | gopls check ./...                        |
+# | delve (dlv)    | github.com/go-delve/delve                | The standard debugger for the Go language  | dlv debug ./main.go                      |
+# | go-callvis     | github.com/ondrajz/go-callvis            | Interactive graph visualization of Go code | go-callvis -format=png -file=<output>    |
+# | impl           | github.com/josharian/impl                | Generates method stubs for interfaces      | impl 'r *Receiver' io.Reader             |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | TYPE: ASSET MANAGEMENT                                                                                                                            |
+# +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
+# | go.rice        | github.com/GeertJohan/go.rice            | Embeds static assets into Go binaries      | rice embed-go                            |
 # +----------------+------------------------------------------+--------------------------------------------+------------------------------------------+
 
 
-# --- Global Configuration & Build Environment ---
+## --- Global Configuration & Build Environment ---
+# Centralized paths for source code, binaries, and distribution archives.
 INSTALL_BASE="/cygdrive/f/stage/install"
-COMPILE_BASE="${INSTALL_BASE}/compile"
-DISTRIB_BASE="${INSTALL_BASE}/distrib"
-BUILD_HOME="bin"
-TAR_OPTS="-Jcf"
+COMPILE_BASE="${INSTALL_BASE}/compile" # Temporary workspace for cloning and building
+DISTRIB_BASE="${INSTALL_BASE}/distrib" # Final destination for compressed archives
+BUILD_HOME="bin"                       # Subdirectory within each tool where binaries are placed
+TAR_OPTS="-Jcf"                        # tar options: J (xz), c (create), f (file)
 
-CPU_CORES=$(nproc)
-LOG_PATH=${TMPDIR}/logs/golang
-SECONDS=0
-ACTION=""
-DO_CLEAN=false
+# System and execution metadata
+CPU_CORES=$(nproc)                     # Detected CPU cores for parallel build optimization
+LOG_PATH=${TMPDIR}/logs/golang         # Path to store build logs for background tasks
+SECONDS=0                              # Timer for calculating total execution duration
+ACTION=""                              # Current build target (determined by CLI arguments)
+DO_CLEAN=false                         # Flag to trigger cache cleanup before execution
 
-# Go build settings
+# Go build settings & optimizations
 export GOPROXY="https://proxy.golang.org,direct"
+# GO_OPTS: -trimpath (removes local file paths), -buildmode=pie (Security: ASLR support), -p (Parallelism)
 GO_OPTS="-trimpath -buildmode=pie -p=$((CPU_CORES / 2))"
 GOARCH=amd64
-GOOS_LIST=(windows linux)
+GOOS_LIST=(windows linux)             # Compile for both Windows and Linux simultaneously
 WINOS_EXT=".exe"
 if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]];then
   OS_EXT="${WINOS_EXT}"
@@ -76,13 +100,17 @@ else
 fi
 
 # CGO and Cross-Compilation (Zig) settings
+# CGO_LDFLAGS: Forces static linking of external libraries (glibc/musl) for portability.
 CGO_LDFLAGS="-linkmode external -extldflags '-static'"
-ZIG_BIN="d:/dev/zig/zig"
+ZIG_BIN="d:/dev/zig/zig"               # Path to the Zig executable (used as a C compiler)
 ZIG_CACHE="$(cygpath ${LOCALAPPDATA})/zig"
+# CC_* variables: Direct Zig to target specific OS/libc families (GNU for Windows, MUSL for Linux).
 CC_WINDOWS="${ZIG_BIN} cc -target x86_64-windows-gnu"
 CC_LINUX="${ZIG_BIN} cc -target x86_64-linux-musl"
 
 # Clears Zig and Go caches to ensure a fresh build environment.
+# Functionality: Deletes temporary build artifacts from Zig's local app data and invokes 'go clean'.
+# Objective: Prevent stale objects or corrupted caches from affecting the build integrity.
 function cleanCache() {
   echo "Cleaning Zig and Go caches..."
   if [ ! -z "${ZIG_CACHE}" ] && [ "${ZIG_CACHE}" != "/" ] && [ -d "${ZIG_CACHE}" ];then
@@ -91,12 +119,17 @@ function cleanCache() {
   go clean -cache
 }
 
-# Updates all Go modules in path
+# Updates all Go modules in the current path to their latest versions.
+# Functionality: Invokes 'go get -u' which updates dependencies in go.mod.
+# Objective: Ensure the tools are built against the most recent bugfixes and features.
 function goUpdateModules() {
   go get -u ./...
 }
 
-# Detect package version
+# Detects and displays the package version for the compiled binary.
+# Arguments: $1 (version flag/mode: v, -v, --v, -V, meta).
+# Functionality: Executes the local binary with various version flags or uses 'go version -m' for metadata.
+# Data Flow: [Compiled Binary] -> [Version Output] -> [Stdout].
 function pkgVersion() {
   case $1 in
     v|-v|--v)
@@ -118,18 +151,24 @@ function pkgVersion() {
 function repoPrep() {
   echo -e "\n----- Building ${PKG_NAME} -----"
   cd ${COMPILE_BASE}
+  # Clean up existing distribution artifacts for this tool
   rm -rf ${DISTRIB_BASE}/$1
+  # Initialize the compile workspace and the final distribution folder
   mkdir -p $1 ${DISTRIB_BASE}/$1 && cd $1
+  # Purge old source to ensure a clean clone
   rm -rf $3
   git clone https://github.com/$2/$3
   cd $3
 
-  # Determine latest tag or latest commit date if no tag found.
+  # HEURISTIC: Determine the latest semantic tag.
+  # 1. List tags. 2. Filter by regex ($4). 3. Sort by version (-V). 4. Exclude pre-releases.
   APP_VERSION=$(git tag -l | grep "$4" | sort -V | grep -v pre | tail -1 | cut -d'/' -f2)
+  # FALLBACK: If no tags match, use the last commit date (YYYYMMDD).
   if [ -z "$APP_VERSION" ]; then
     APP_VERSION=$(git log -1 --format=%cs | tr -d '-')
   fi
   APP_HASH=$(git rev-parse --short=7 HEAD)
+  # Combine version and hash for a unique identifier (e.g., 1.2.3-abc1234)
   PKG_VER="${APP_VERSION}-${APP_HASH}"
 }
 
@@ -138,24 +177,29 @@ function repoPrep() {
 # Functionality: Standardizes the Go module state and ensures the code is formatted and vetted.
 # Data Flow: [Source Code] -> [Go Toolchain (tidy, vendor, fmt, vet)] -> [Staged Git Commit].
 function codeAnalysis() {
+  # Mode: VENDOR - Necessary for tools with large dependency trees or non-standard go.mod files.
   if [ "$1" == "VENDOR" ];then
     go mod vendor
   fi
+  # Synchronize go.mod and go.sum with the actual imports in the source code.
   go mod tidy
+  # Mode: FULL - Ensures that the binaries are built from standardized, high-quality source code.
   if [ "$1" == "FULL" ];then
     go fmt ./...
     go vet ./...
   fi
+  # Track all local changes (like vendoring or formatting) in a temporary commit for auditability.
   git add . &>/dev/null
   git commit -m "Final build changes" &>/dev/null
 }
 
-# Core compilation engine that handles cross-platform Go builds with optional CGO/Zig support.
+## Core compilation engine that handles cross-platform Go builds with optional CGO/Zig support.
 # Arguments: Space-separated flags like "CMD" (subdir build), "SUB" (shallow subdir), "CGO" (enable Zig CC).
 # Functionality: Dynamically sets build paths, env vars, and invokes 'go build' for each target OS.
 # Data Flow: [Environment/LDFLAGS] -> [Go Compiler + Zig CC (if CGO)] -> [Architecture-Specific Binaries].
 function codeBuild() {
   PATH_REL=".."
+  # LOGIC: Navigate to the appropriate subdirectory based on the tool's repository structure.
   if [[ "$*" =~ "CMD" ]];then
     PATH_REL="../../.."
     cd cmd/${PKG_BIN}
@@ -165,12 +209,18 @@ function codeBuild() {
   elif [[ "$*" =~ "PRE" ]];then
     PATH_REL="../.."
   fi
+  
+  # Calculate the binary destination relative to the current subdirectory.
   BUILD_BASE="${PATH_REL}/${BUILD_HOME}"
+  
+  # Define Linker Flags (LDFLAGS) for version injection and size reduction.
   if [ -z "${PKG_VER_LDFLAG}" ];then
     GO_LDFLAGS=""
   else
     GO_LDFLAGS="${PKG_VER_LDFLAG}"
   fi
+  
+  # Enable CGO if requested (required for tools like Delve).
   if [[ "$*" =~ "CGO" ]];then
     CGO=1
 	GO_LDFLAGS="${GO_LDFLAGS} ${CGO_LDFLAGS}"
@@ -178,9 +228,12 @@ function codeBuild() {
     CGO=0
 	GO_LDFLAGS="${GO_LDFLAGS}"
   fi
+  
   echo -e "\n  - Compiling version ${PKG_VER}"
+  # MAIN LOOP: Build for every Operating System defined in GOOS_LIST.
   for GOOS in "${GOOS_LIST[@]}"; do
     echo "Building for GOOS: $GOOS, GOARCH: $GOARCH"
+	# Inject Zig CC as the cross-compiler for C-code dependencies.
 	if [ $CGO -eq 1 ];then
 	  case "$GOOS" in
   	    "windows")
@@ -189,10 +242,13 @@ function codeBuild() {
 		"linux")
   		  export CC="${CC_LINUX}"
 		;;
- 	  esac
+  	  esac
 	fi
+    # -s: Omit symbol table and debug info. -w: Omit DWARF symbol table.
     CGO_ENABLED=$CGO GOOS=$GOOS go build -ldflags "-s -w ${GO_LDFLAGS}" ${GO_OPTS} -o ${BUILD_BASE}/ >/dev/null
   done
+  
+  # Return to build directory and verify binaries.
   cd ${BUILD_BASE}
   ls -l ${PKG_BIN}{${OS_EXT},}
 }
@@ -206,12 +262,22 @@ function generateArchive() {
   if [ ! -z "$2" ];then
     BIN_LIST="${BIN_LIST} $2"
   fi
+  
+  # WINDOWS PACKAGING: Append .exe to all binaries before zipping.
+  # BIN_LIST// /${WINOS_EXT}  : Bash string replacement to add .exe to space-separated names.
   tar ${TAR_OPTS} ${DISTRIB_BASE}/${PKG_NAME}/${PKG_NAME}-${PKG_VER}_windows-amd64.tar.xz ${BIN_LIST// /${WINOS_EXT} }${WINOS_EXT} && rm -f ${BIN_LIST// /${WINOS_EXT} }${WINOS_EXT}
+  
+  # LINUX PACKAGING: Standard filenames (no extension).
   tar ${TAR_OPTS} ${DISTRIB_BASE}/${PKG_NAME}/${PKG_NAME}-${PKG_VER}_linux-amd64.tar.xz ${BIN_LIST} && rm -f ${PKG_NAME} ${BIN_LIST}
+  
+  # Listing resulting archives for verification.
   ls -l ${DISTRIB_BASE}/${PKG_NAME}/*.xz
+  
+  # WORKSPACE CLEANUP: Remove the temporary compile folders to save disk space.
   if [ $? -eq 0 ];then
     cd ../
     if [ "$3" != "NOPURGE" ];then
+      # Safety check: Prevent accidental deletion of root or system folders.
       [[ -n "$1" && "$1" != "/" && -d "./$1" ]] && rm -rf ./$1 ./${BUILD_HOME}
 	fi
   fi
@@ -538,34 +604,91 @@ function build_benchstat() {
   )
 }
 
+# mockery: Generates type-safe mocks for Go interfaces.
+# Objectives: Streamline unit testing by automating mock generation.
+# Data Flow: repoPrep -> codeAnalysis -> codeBuild (MAIN) -> generateArchive.
+function build_mockery() {
+  (
+    PKG_NAME=mockery
+    PKG_BASE=${PKG_NAME}
+    PKG_BIN=${PKG_NAME}
+    repoPrep ${PKG_NAME} vektra ${PKG_BASE} "v"
+    PKG_VER_LDFLAG=""
+    goUpdateModules
+    codeAnalysis
+    codeBuild "MAIN"
+    pkgVersion "meta"
+    generateArchive ${PKG_BASE}
+  )
+}
+
+# copyloopvar: Detects places where loop variables are captured by reference.
+# Objectives: Prevent common Go concurrency bugs related to loop variable scoping.
+# Data Flow: repoPrep -> codeAnalysis -> codeBuild (CMD) -> generateArchive.
+function build_copyloopvar() {
+  (
+    PKG_NAME=copyloopvar
+    PKG_BASE=${PKG_NAME}
+    PKG_BIN=${PKG_NAME}
+    repoPrep ${PKG_NAME} karamaru-alpha ${PKG_BASE} "v"
+    PKG_VER_LDFLAG=""
+    goUpdateModules
+    codeAnalysis
+    codeBuild "CMD"
+    pkgVersion "meta"
+    generateArchive ${PKG_BASE}
+  )
+}
+
+function build_goleak() {
+  cat << "EOF"
+
+GOLEAK INTEGRATION NOTE:
+------------------------
+goleak is a library imported into test binaries via "go test". 
+It acts as a gatekeeper that fails tests if it detects any goroutines 
+that were started but never finished.
+
+HOW TO USE IT IN A WORKFLOW:
+----------------------------
+1. Add it to the Go code: add a TestMain function to *_test.go files.
+2. Run the tests: execute "go test ./..."
+3. The Result: if a leak is found, the "go test" command itself will exit with 
+   a non-zero status (failure) and print the leaked goroutine's stack trace.
+
+EOF
+}
+
 # ________________________________________________________________________________________________________________________
 # Main Build Logic Entry Point
 # ________________________________________________________________________________________________________________________
 
 # 0. Parse Command Line Arguments
+# This loop iterates through all CLI provided arguments.
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
     --help|-h)
-      ACTION="HELP"
+      ACTION="HELP" # Flag as help to be handled in the validation stage
       shift
     ;;
     --clean-cache)
+      # Execution immediately cleans caches if the flag is present
       cleanCache
       DO_CLEAN=true
       shift
     ;;
     all)
-      ACTION="all"
+      ACTION="all" # Set target to build all 20 tools concurrently
       shift
     ;;
     *)
-      # Check if the argument matches a build function (e.g., build_gofumpt)
+      # DYNAMIC DISPATCH: Check if the argument is a valid bash function name
       if declare -f "$1" > /dev/null; then
         ACTION="$1"
         shift
       else
-        echo "Error: Unknown function or option '$1'"
-        ACTION="HELP" # Force help on invalid input
+        echo "Error: Unknown target or option '$1'"
+        ACTION="HELP" # Unknown input fallback: show usage guide
         shift
       fi
     ;;
@@ -612,41 +735,46 @@ if [ "$ACTION" == "HELP" ]; then
   echo "  build_gocritic        Build only gocritic"
   echo "  build_impl            Build only impl"
   echo "  build_gocallvis       Build only go-callvis"
-  echo "  build_benchstat       Build only build_benchstat"
+  echo "  build_benchstat       Build only benchstat"
+  echo "  build_mockery         Build only mockery"
+  echo "  build_copyloopvar     Build only copyloopvar"
+  echo "  build_goleak          Build only goleak"
   echo ""
   echo "Example: ./$(basename "$0") --clean-cache all"
   echo "-------------------------------------------------------------------"
   exit 1
 fi
 
-# 3. Execution Phase
+# 3. Execution Phase: Background Processing and Parallelism
 mkdir -p ${LOG_PATH}
 rm -f ${LOG_PATH}/*.log
 
 if [ "$ACTION" == "all" ]; then
-  # List of all tools to be built in parallel mode
-  ALL_BUILDS=(build_gofumpt build_govulncheck build_golangci-lint build_staticcheck build_gopls build_delve build_gocyclo build_goconst build_interfacebloat build_nilaway build_gosec build_gorice build_gomnd build_gocritic build_impl build_gocallvis build_benchstat)
+  # COMPREHENSIVE SUITE: List of all build targets for parallel processing
+  ALL_BUILDS=(build_gofumpt build_govulncheck build_golangci-lint build_staticcheck build_gopls build_delve build_gocyclo build_goconst build_interfacebloat build_nilaway build_gosec build_gorice build_gomnd build_gocritic build_impl build_gocallvis build_benchstat build_mockery build_copyloopvar build_goleak)
 
   echo "Running all builds in parallel..."
-  pids=()
+  pids=() # Array to keep track of background Process IDs
 
   for func in "${ALL_BUILDS[@]}"; do
-    # Launch build in subshell, backgrounded, output to specific log file
+    # ISOLATION: Launch each build in a background subshell.
+    # This prevents environment variable leakage between different tool builds.
+    # Output to specific log file.
     $func > "${LOG_PATH}/${func}.log" 2>&1 &
-    pids+=($!) # Store the Process ID
+    pids+=($!) # Capturing the PID of the backgrounded subshell
     echo "  [Started] $func (PID: $!)"
   done
 
-  # Process Monitoring Logic:
+  # MONITORING LOOP: Dynamically track completion status of all background jobs.
   # This loop waits for background tasks to complete. For each finished process, it 
   # captures the exit status and cross-references the PID with the ALL_BUILDS list 
   # to provide real-time feedback on which specific tool succeeded or failed.
   while [ ${#pids[@]} -gt 0 ]; do
-    # Wait for any process to finish and get its PID
+    # Wait for the next process to exit and capture its PID and status.
     wait -n -p finished_pid
     exit_status=$?
 
-    # Find which function name belongs to this PID
+    # Resolve the function name associated with the finished PID.
     for i in "${!pids[@]}"; do
       if [[ "${pids[$i]}" == "$finished_pid" ]]; then
         func_name="${ALL_BUILDS[$i]}"
@@ -654,10 +782,11 @@ if [ "$ACTION" == "all" ]; then
         if [ $exit_status -eq 0 ]; then
           echo "  [Success] $func_name (Finished PID: $finished_pid)"
         else
+          # Error handling: Point the user to the tool-specific log file on failure.
           echo "  [FAILED ] $func_name - Status: $exit_status (See ${LOG_PATH}/${func_name}.log)"
         fi
             
-        # Remove this PID from the array so the loop eventually ends
+        # Removal: Update the array to reflect that this job is complete.
         unset "pids[$i]"
         break
       fi
@@ -665,7 +794,7 @@ if [ "$ACTION" == "all" ]; then
   done
   echo "All parallel build tasks completed."
 else
-  # Single Target Execution
+  # SINGLE TARGET: Execute exactly one build function synchronously.
   echo "Running specific build: $ACTION"
   $ACTION
 fi
