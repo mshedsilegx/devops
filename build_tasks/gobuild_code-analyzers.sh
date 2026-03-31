@@ -2,11 +2,11 @@
 
 # --------------------------------------------------------------------------------
 #  e:/data/devel/build/code/private/devops/build_tasks/gobuild_code-analyzers.sh
-#  v1.1.2xg  2026/03/30  XDG
+#  v1.1.3xg  2026/03/31  XDG
 # --------------------------------------------------------------------------------
 # Objectives:
 #   - Automated Build Pipeline: Provide a streamlined, reproducible process for building a curated suite of Go static analysis and development tools.
-#   - Unified Tooling: Maintain a consistent set of 17+ essential Go tools in a portable, pre-compiled format.
+#   - Unified Tooling: Maintain a consistent set of essential Go tools in a portable, pre-compiled format.
 #   - Cross-Platform Support: Support high-performance, statically linked binaries for both Windows (x86_64-windows-gnu) and Linux (x86_64-linux-musl).
 #   - Advanced Compilation: Leverage the Zig toolchain as a drop-in C compiler replacement (CGO_ENABLED=1) to achieve easy cross-compilation with modern C libraries.
 #   - Version Integrity: Automatically derive semantic versions or short commit hashes to ensure every binary's origin is traceable.
